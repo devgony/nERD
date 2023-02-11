@@ -1,0 +1,15 @@
+[package]
+name = "nERD"
+version = "0.1.0"
+edition = "2021"
+authors = ["henry <devgony@gmail.com>"]
+license = "Apache-2.0"
+license-file = "LICENSE"
+description = "The nerdy Entity Relationship Diagram"
+documentation = "https://docs.rs/nERD"
+
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]

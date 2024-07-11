@@ -11,6 +11,8 @@ documentation = "https://docs.rs/nERD"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+gluesql-core = { git = "https://github.com/gluesql/gluesql", rev = "25309dd15a50ee061e714576079b2cd8c1fcca9c" }
+sqlparser = "0.45.0"
 
 [dependencies.cursive]
 version = "0.20"

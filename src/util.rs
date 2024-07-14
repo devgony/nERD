@@ -1,4 +1,12 @@
-// use std::fmt::{Debug, Display};
+use std::fmt::{Debug, Display};
+
+pub fn assert_text<T: PartialEq + Display + Debug>(actual: T, expected: T) {
+    if actual != expected {
+        println!("Actual:\n{}", actual);
+        println!("Expected:\n{}", expected);
+    }
+    assert_eq!(actual, expected);
+}
 
 // use gluesql_core::data::Schema;
 
@@ -118,11 +126,4 @@
 //         assert_text(actual, expected.to_owned());
 //     }
 
-//     fn assert_text<T: PartialEq + Display + Debug>(actual: T, expected: T) {
-//         if actual != expected {
-//             println!("Actual:\n{}", actual);
-//             println!("Expected:\n{}", expected);
-//         }
-//         assert_eq!(actual, expected);
-//     }
 // }

@@ -1,38 +1,40 @@
+use std::fmt::Display;
+
 use gluesql_core::{ast::DataType, data::Schema};
 
 #[derive(PartialEq, Debug)]
-struct Entity {
-    name: String,
-    attributes: Vec<Attribute>,
-    x: usize,
-    y: usize,
+pub struct Entity {
+    pub name: String,
+    pub attributes: Vec<Attribute>,
+    pub x: usize,
+    pub y: usize,
 }
 
 #[derive(PartialEq, Debug)]
-struct Attribute {
-    name: String,
-    data_type: DataType,
-    reffered_by: Option<(String, String)>,
-    reffering_to: Option<(String, String)>,
+pub struct Attribute {
+    pub name: String,
+    pub data_type: DataType,
+    pub reffered_by: Option<(String, String)>,
+    pub reffering_to: Option<(String, String)>,
 }
 
-fn into_entities(schemas: Vec<Schema>) -> Vec<Entity> {
+pub fn into_entities(schemas: Vec<Schema>) -> Vec<Entity> {
     const LAYOUT_SIZE: usize = 100;
     const MARGIN: usize = 1;
     const ENTITY_WIDTH: usize = 12; // includes line width
     const GAP: usize = 3;
-    let mut max_y = MARGIN;
+    // let mut max_y = MARGIN;
 
     schemas
         .iter()
         .enumerate()
-        .map(|(index, schema)| {
+        .fold(Vec::new(), |mut acc, (index, schema)| {
             let attributes: Vec<Attribute> = schema
                 .column_defs
                 .as_ref()
                 .map(|column_defs| {
                     column_defs
-                        .into_iter()
+                        .iter()
                         .map(|column_def| {
                             let reffering_to = schema.foreign_keys.iter().find_map(|fk| {
                                 (fk.referencing_column_name == column_def.name).then_some((
@@ -72,27 +74,42 @@ fn into_entities(schemas: Vec<Schema>) -> Vec<Entity> {
             // if x is over than 400, move next line, which means it should start over the max(y)
             // should memorize max(y) with scan? => temporarily use mut global var
 
-            let x = MARGIN + (ENTITY_WIDTH + GAP) * index;
-            let y = max_y;
-            let (x, y) = match x > LAYOUT_SIZE {
-                true => (
-                    MARGIN
-                        + (ENTITY_WIDTH + GAP)
-                            * (index % ((LAYOUT_SIZE - MARGIN) / (ENTITY_WIDTH + GAP))),
-                    y + attributes.len() + 1 + GAP,
-                ),
-                false => (x, y),
-            };
-            max_y = y;
+            let number_of_entities_in_row =
+                ((LAYOUT_SIZE - 2 * MARGIN) as f64 / (ENTITY_WIDTH + GAP) as f64).floor() as usize; // should subtract 1 gap at the right most
 
-            Entity {
+            let x = MARGIN + (index % number_of_entities_in_row) * (ENTITY_WIDTH + GAP);
+            let y = acc
+                .iter()
+                .rfind(|entity| entity.x == x)
+                .map(|entity| entity.y + entity.attributes.len() + 4 + GAP)
+                .unwrap_or(MARGIN);
+
+            // let y =
+            // let y = max_y;
+            // let (x, y) = if x > LAYOUT_SIZE {
+            //     (
+            //         MARGIN
+            //             + (ENTITY_WIDTH + GAP)
+            //                 * (index % ((LAYOUT_SIZE - MARGIN) / (ENTITY_WIDTH + GAP))),
+            //         max_y + attributes.len() + 3 + GAP,
+            //     )
+            // } else {
+            //     (x, y)
+            // };
+
+            // if x > LAYOUT_SIZE {
+            //     max_y = y;
+            // }
+
+            acc.push(Entity {
                 name: schema.table_name.clone(),
                 attributes,
                 x,
                 y,
-            }
+            });
+
+            acc
         })
-        .collect::<Vec<_>>()
 }
 
 #[cfg(test)]
@@ -137,9 +154,9 @@ CREATE TABLE Tab10 (col1 INT, col2 INT);
                 ("Tab5".to_owned(), 61, 1),
                 ("Tab6".to_owned(), 76, 1),
                 ("Tab7".to_owned(), 91, 1),
-                ("Tab8".to_owned(), 16, 7),
-                ("Tab9".to_owned(), 31, 13),
-                ("Tab10".to_owned(), 46, 19),
+                ("Tab8".to_owned(), 1, 9),
+                ("Tab9".to_owned(), 16, 9),
+                ("Tab10".to_owned(), 31, 9)
             ]
         );
     }

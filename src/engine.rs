@@ -2,6 +2,8 @@ use std::fmt::Display;
 
 use gluesql_core::{ast::DataType, data::Schema};
 
+use crate::constants::{ENTITY_WIDTH, GAP, LAYOUT_SIZE, MARGIN};
+
 #[derive(PartialEq, Debug)]
 pub struct Entity {
     pub name: String,
@@ -19,10 +21,6 @@ pub struct Attribute {
 }
 
 pub fn into_entities(schemas: Vec<Schema>) -> Vec<Entity> {
-    const LAYOUT_SIZE: usize = 100;
-    const MARGIN: usize = 1;
-    const ENTITY_WIDTH: usize = 12; // includes line width
-    const GAP: usize = 3;
     // let mut max_y = MARGIN;
 
     schemas

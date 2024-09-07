@@ -3,7 +3,7 @@ use std::fmt::{Debug, Display};
 pub fn assert_text<T: PartialEq + Display + Debug>(actual: T, expected: T) {
     if actual != expected {
         println!("Actual:\n{}", actual);
-        println!("Expected:\n{}", expected);
+        // println!("Expected:\n{}", expected);
     }
     assert_eq!(actual, expected);
 }

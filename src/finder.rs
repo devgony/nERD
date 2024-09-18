@@ -109,7 +109,8 @@ impl Char {
             Char::RightUp => '┘',
             Char::RightDown => '┐',
             Char::FkFrom => '├',
-            Char::FkTo => '→',
+            // Char::FkTo => '→',
+            Char::FkTo => '┤',
             Char::None => ' ',
         }
     }
@@ -123,7 +124,8 @@ impl Char {
             '┘' => Char::RightUp,
             '┐' => Char::RightDown,
             '├' => Char::FkFrom,
-            '→' => Char::FkTo,
+            // '→' => Char::FkTo,
+            '┤' => Char::FkTo,
             ' ' => Char::None,
             _ => panic!("Invalid char"),
         }
@@ -132,30 +134,43 @@ impl Char {
 
 struct Diagram {
     canvas: Vec<Vec<char>>,
-    point: Point,
-    target: Point,
+    from: Point,
+    to: Point,
 }
 impl Diagram {
-    fn new(content: Vec<Vec<char>>, target: Point) -> Self {
+    fn new(content: Vec<Vec<char>>, from: Point, to: Point) -> Self {
         Diagram {
             canvas: content,
-            point: Point::new(0, 0),
-            target,
+            from,
+            to,
         }
     }
 
+    fn init(&mut self) {
+        let Point { x, y } = self.from;
+        self.canvas[y][x] = Char::FkFrom.as_char();
+        let Point { x, y } = self.to;
+        self.canvas[y][x] = Char::FkTo.as_char();
+    }
+
     fn next(&mut self, direction: &Direction) {
-        self.point = self.point.next(direction);
+        self.from = self.from.next(direction);
     }
 
     fn get_char(&self) -> char {
-        let Point { x, y } = self.point;
+        let Point { x, y } = self.from;
+
+        self.canvas[y][x]
+    }
+
+    fn get_char_to(&self) -> char {
+        let Point { x, y } = self.to;
 
         self.canvas[y][x]
     }
 
     fn set_char(&mut self, ch: char) {
-        let Point { x, y } = self.point;
+        let Point { x, y } = self.from;
 
         self.canvas[y][x] = ch;
     }
@@ -169,11 +184,11 @@ impl Diagram {
     }
 
     fn anlayze_direction(&mut self, direction: Option<Direction>) -> Direction {
-        let Point { x, y } = self.point;
+        let Point { x, y } = self.from;
         let Point {
             x: target_x,
             y: target_y,
-        } = self.target;
+        } = self.to;
 
         let horizontal_distance = (target_x as i32 - x as i32).abs();
         let vertical_distance = (target_y as i32 - y as i32).abs();
@@ -193,6 +208,7 @@ impl Diagram {
                 (false, _, false) => Direction::Down,
             },
         );
+        println!(">>>>>>>{try_direction}");
 
         // let try_direction = if prev_direction == try_direction {
         //     match try_direction {
@@ -218,10 +234,11 @@ impl Diagram {
         //     try_direction
         // };
 
-        let cur_char = self.point.get_char(&self.canvas);
-        let try_char = self.point.next(&try_direction).get_char(&self.canvas);
+        let cur_char = self.from.get_char(&self.canvas);
+        let try_char = self.from.next(&try_direction).get_char(&self.canvas);
 
         // do i need cur_char to analyze the direction? yes if it has to make the corner
+        println!(">> {},{},{}", cur_char, try_direction, try_char);
         let next_direction = match (cur_char, try_direction, try_char) {
             (cur_char, direction, Char::None) => {
                 match (cur_char, &direction) {
@@ -259,7 +276,7 @@ impl Diagram {
                         self.set_char(Char::Horizontal.as_char())
                     }
                     (cur_char, direction) => {
-                        println!("cur_char: {:?}, direction: {:?}", cur_char, direction);
+                        // println!("cur_char: {:?}, direction: {:?}", cur_char, direction);
                         self.next(direction);
                         match direction {
                             Direction::Right | Direction::Left => {
@@ -313,7 +330,10 @@ impl Diagram {
             }
             (Char::Horizontal, Direction::Right, Char::FkTo)
             | (Char::DownRight, Direction::Right, Char::FkTo)
+            | (Char::Vertical, Direction::Right, Char::FkTo)
             | (Char::UpRight, Direction::Right, Char::FkTo) => {
+                self.set_char(Char::DownRight.as_char());
+
                 return Direction::None;
             }
             (Char::Vertical, Direction::Right, _) => {
@@ -323,8 +343,9 @@ impl Diagram {
                     Direction::Up
                 }
             }
-            // (Char::Vertical, Direction::Right, Char::DownRight) => {}
-            // vertical, up , rightdown
+            // (Char::Vertical, Direction::Up, Char::RightDown) => {}
+
+            // vertical, up , rightdown should be handled
             x => unreachable!("{:?}", x),
             // (Char::Vertical, Direction::Right, Char::Horizontal)
             // | (Char::Horizontal, Direction::Up, Char::Vertical)
@@ -361,7 +382,7 @@ mod tests {
 
     use cursive::vec;
 
-    use crate::finder::{Diagram, Direction, Point};
+    use crate::finder::{Char, Diagram, Direction, Point};
 
     #[test]
     fn test_point() {
@@ -369,7 +390,7 @@ mod tests {
  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐            
  │Tab1      │   │Tab2      │   │Tab3      │   │Tab4      │   │Tab5      │   │Tab6      │            
  ├──────────┤   ├──────────┤   ├──────────┤   ├──────────┤   ├──────────┤   ├──────────┤            
- │col1      ├   │col1      │   │col1      │   │col1      │   │col1      │   │col1      │            
+ │col1      │   │col1      │   │col1      │   │col1      │   │col1      │   │col1      │            
  │col2      │   │col2      │   │col2      │   │col2      │   │col2      │   │col2      │            
  │col3      │   └──────────┘   │col3      │   └──────────┘   └──────────┘   └──────────┘            
  │col4      │                  │col4      │                                                         
@@ -408,7 +429,7 @@ mod tests {
                 ┌──────────┐  │└──────────┘   ┌──────────┐   ┌──────────┐   ┌──────────┐            
                 │Tab8      │  └─────────────┐ │Tab10     │   │Tab11     │   │Tab12     │            
  ┌──────────┐   ├──────────┤                │ ├──────────┤   ├──────────┤   ├──────────┤            
- │Tab7      │   │col1      │                └─│col1      │   │col1      │   │col1      │            
+ │Tab7      │   │col1      │                └→┤col1      │   │col1      │   │col1      │            
  ├──────────┤   │col2      │   ┌──────────┐   │col2      │   │col2      │   │col2      │            
  │col1      │   └──────────┘   │Tab9      │   └──────────┘   └──────────┘   └──────────┘            
  │col2      │                  ├──────────┤                                                         
@@ -426,26 +447,32 @@ mod tests {
                                └──────────┘
 ";
 
-        let mut canvas = Diagram {
-            canvas: actual_source
+        let mut diagram = Diagram::new(
+            actual_source
                 .split("\n")
                 .map(|line| line.chars().collect::<Vec<_>>())
                 .collect::<Vec<_>>(),
-            point: Point::new(12, 4),
-            target: Point::new(46, 13),
-        };
-        assert_eq!(canvas.get_char(), '├');
+            Point::new(12, 4),
+            Point::new(16, 8),
+            // Point::new(46, 14),
+        );
+
+        // diagram.canvas[13][46] = 'X';
+
+        diagram.init();
+        assert_eq!(diagram.get_char(), Char::FkFrom.as_char());
+        assert_eq!(diagram.get_char_to(), Char::FkTo.as_char());
 
         // anaylze the direction
         // mutate cur_char and next_char if needed
         //
-        for _ in 0..43 {
-            canvas.anlayze_direction(None);
+        for _ in 0..50 {
+            diagram.anlayze_direction(None);
         }
         // canvas.next();
         println!(
             "{}",
-            canvas.to_string().chars().take(2000).collect::<String>()
+            diagram.to_string().chars().take(2000).collect::<String>()
         );
 
         // let canvas = canvas.next();

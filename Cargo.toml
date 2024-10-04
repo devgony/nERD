@@ -12,6 +12,7 @@ documentation = "https://docs.rs/nERD"
 
 [dependencies]
 gluesql-core = { git = "https://github.com/gluesql/gluesql", rev = "25309dd15a50ee061e714576079b2cd8c1fcca9c" }
+ratatui = { version = "0.28.1", features = ["all-widgets"] }
 sqlparser = "0.45.0"
 
 [dependencies.cursive]
@@ -22,3 +23,7 @@ version = "0.20"
 # [dependencies.crossterm]
 # version = "0.23"
 # features = ["event-stream"]
+
+# [[bin]]
+# name = "graph"
+# path = "src/graph.rs"

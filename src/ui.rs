@@ -1,7 +1,7 @@
 use std::borrow::BorrowMut;
 
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Size},
+    layout::{Constraint, Direction, Layout, Rect, Size},
     prelude::StatefulWidget,
     style::{Color, Modifier, Style},
     text::Text,
@@ -10,7 +10,7 @@ use ratatui::{
 };
 use tui_scrollview::ScrollView;
 
-use crate::app::App;
+use crate::{app::App, builder::RectBuilder};
 
 pub fn ui(frame: &mut Frame, app: &mut App) {
     let schemas = app.get_schemas();
@@ -18,13 +18,15 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
 
     let [title_rect, main_rect] = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(3), Constraint::Min(0)])
+        .constraints([Constraint::Length(3), Constraint::Fill(1)])
         .areas(frame.area());
 
     let [sql_rect, erd_rect] = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(30), Constraint::Percentage(70)])
         .areas(main_rect);
+
+    let mut scroll_view = ScrollView::new(Size::new(erd_rect.width, 100));
 
     let items = [
         "Item 1", "Item 2", "Item 3", "Item 4", "Item 5", "Item 6", "Item 7", "Item 8",
@@ -38,21 +40,58 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
         .repeat_highlight_symbol(true)
         .direction(ListDirection::TopToBottom);
 
-    let mut scroll_view = ScrollView::new(Size::new(erd_rect.width, 100));
+    let lists = vec![
+        list.clone(),
+        list.clone(),
+        list.clone(),
+        list.clone(),
+        list.clone(),
+        list.clone(),
+        list.clone(),
+        list.clone(),
+        list.clone(),
+    ];
+    let mut rect_builder = RectBuilder::new(erd_rect.width);
+    for list in lists {
+        let rect = rect_builder.get_rect(list.len() + 2);
 
-    Layout::horizontal([Constraint::Length(20); 4])
-        .split(erd_rect)
-        .into_iter()
-        .for_each(|column| {
-            Layout::vertical([Constraint::Min(100); 9])
-                .margin(1)
-                .split(*column)
-                .into_iter()
-                .for_each(|y| {
-                    // As widget is rendered, the layout should be larger to be scrollable
-                    scroll_view.render_widget(list.clone(), *y);
-                });
-        });
+        scroll_view.render_widget(list.clone(), rect);
+    }
+
+    // let test_paragraph = Paragraph::new(Text::styled(
+    //     "This is a long paragraph\na\nb\nc\nd\ne\nf\ng\nh\ni\nj",
+    //     Style::default().fg(Color::Green),
+    // ));
+
+    // Layout::vertical([Constraint::Fill(1); 9])
+    //     .split(erd_rect)
+    //     .into_iter()
+    //     .for_each(|cell| {
+    //         scroll_view.render_widget(test_paragraph.clone(), *cell);
+    //     });
+
+    // Layout::horizontal([Constraint::Length(20); 4])
+    //     .split(erd_rect)
+    //     .into_iter()
+    //     .for_each(|column| {
+    //         Layout::vertical([Constraint::Fill(1); 9])
+    //             // .margin(1)
+    //             .split(*column)
+    //             .into_iter()
+    //             .for_each(|cell| {
+    //                 // As widget is rendered, the layout should be larger to be scrollable
+    //                 scroll_view.render_widget(list.clone(), *cell);
+    //             });
+    //     });
+
+    // isn't there a way to render grid of widgets according to layout? not like manually rendering each widget by cordinates
+    // let height = items.len() as u16 + 2; // +2 for the border
+    // let test_rect = Rect::new(5, 5, 20, height);
+    // scroll_view.render_widget(list.clone(), test_rect);
+
+    // let test_rect = Rect::new(5 + 20 + 2, 5, 20, height);
+    // scroll_view.render_widget(list, test_rect);
+
     scroll_view.render(
         erd_rect,
         frame.buffer_mut(),

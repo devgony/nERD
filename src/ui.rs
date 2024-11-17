@@ -14,6 +14,23 @@ use crate::{app::App, builder::RectBuilder};
 
 pub fn ui(frame: &mut Frame, app: &mut App) {
     let schemas = app.get_schemas();
+    let lists = schemas.iter().map(|schema| {
+        let column_names = schema
+            .clone()
+            .column_defs
+            .unwrap_or_default()
+            .iter()
+            .map(|column_def| column_def.name.clone())
+            .collect::<Vec<_>>();
+
+        List::new(column_names)
+            .block(Block::bordered().title(schema.table_name.clone()))
+            .style(Style::default().fg(Color::White))
+            .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
+            .highlight_symbol(">>")
+            .repeat_highlight_symbol(true)
+            .direction(ListDirection::TopToBottom)
+    });
     // a schema will take 20 of width and the number of column_defs of height
 
     let [title_rect, main_rect] = Layout::default()
@@ -28,29 +45,29 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
 
     let mut scroll_view = ScrollView::new(Size::new(erd_rect.width, 100));
 
-    let items = [
-        "Item 1", "Item 2", "Item 3", "Item 4", "Item 5", "Item 6", "Item 7", "Item 8",
-    ];
+    // let items = [
+    //     "Item 1", "Item 2", "Item 3", "Item 4", "Item 5", "Item 6", "Item 7", "Item 8",
+    // ];
 
-    let list = List::new(items)
-        .block(Block::bordered().title("Table1"))
-        .style(Style::default().fg(Color::White))
-        .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
-        .highlight_symbol(">>")
-        .repeat_highlight_symbol(true)
-        .direction(ListDirection::TopToBottom);
+    // let list = List::new(items)
+    //     .block(Block::bordered().title("Table1"))
+    //     .style(Style::default().fg(Color::White))
+    //     .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
+    //     .highlight_symbol(">>")
+    //     .repeat_highlight_symbol(true)
+    //     .direction(ListDirection::TopToBottom);
 
-    let lists = vec![
-        list.clone(),
-        list.clone(),
-        list.clone(),
-        list.clone(),
-        list.clone(),
-        list.clone(),
-        list.clone(),
-        list.clone(),
-        list.clone(),
-    ];
+    // let lists = vec![
+    //     list.clone(),
+    //     list.clone(),
+    //     list.clone(),
+    //     list.clone(),
+    //     list.clone(),
+    //     list.clone(),
+    //     list.clone(),
+    //     list.clone(),
+    //     list.clone(),
+    // ];
     let mut rect_builder = RectBuilder::new(erd_rect.width);
     for list in lists {
         let rect = rect_builder.get_rect(list.len() + 2);

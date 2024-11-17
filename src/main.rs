@@ -26,9 +26,24 @@ fn main() -> Result<(), Box<dyn Error>> {
     init_error_hooks()?;
     let mut terminal = init_terminal()?;
 
-    let sql_text = "CREATE TABLE t1 (a int, b int);
-CREATE TABLE t2 (c int, d int);"
-        .to_string();
+    // should be enough complicated table exaples at least more than 6 columns
+    let sql_text =
+        "CREATE TABLE Employee (id int, name text, age int, salary int, address text, phone text);
+CREATE TABLE Department (id int, name text, location text);
+CREATE TABLE EmployeeDepartment (id int, employee_id int, department_id int);
+CREATE TABLE EmployeeManager (id int, employee_id int, manager_id int);
+CREATE TABLE Manager (id int, name text, age int, salary int, address text, phone text);
+CREATE TABLE EmployeeSalary (id int, employee_id int, salary int);
+CREATE TABLE EmployeeAddress (id int, employee_id int, address text);
+CREATE TABLE EmployeePhone (id int, employee_id int, phone text);
+CREATE TABLE DepartmentLocation (id int, department_id int, location text);
+CREATE TABLE DepartmentManager (id int, department_id int, manager_id int);
+CREATE TABLE ManagerSalary (id int, manager_id int, salary int);
+CREATE TABLE ManagerAddress (id int, manager_id int, address text);
+CREATE TABLE ManagerPhone (id int, manager_id int, phone text);
+CREATE TABLE SalaryAddress (id int, salary_id int, address_id int);
+CREATE TABLE SalaryPhone (id int, salary_id int, phone_id int);"
+            .to_string();
 
     let mut app = App::new(sql_text);
     run_app(&mut terminal, &mut app)?;

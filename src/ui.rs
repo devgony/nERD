@@ -1,8 +1,8 @@
 use std::borrow::BorrowMut;
 
+use ratatui::widgets::StatefulWidget;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect, Size},
-    prelude::StatefulWidget,
     style::{Color, Modifier, Style},
     text::Text,
     widgets::{Block, Borders, List, ListDirection, Paragraph},
@@ -121,12 +121,14 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
     let title =
         Paragraph::new(Text::styled("nERD", Style::default().fg(Color::Green))).block(title_block);
 
-    let sql_paragrah = Paragraph::new(Text::styled(
-        app.sql_text.clone(),
-        Style::default().fg(Color::Green),
-    ))
-    .block(Block::bordered().title("SQL pane"));
+    // let sql_paragrah = Paragraph::new(Text::styled(
+    //     app.sql_text.clone(),
+    //     Style::default().fg(Color::Green),
+    // ))
+    // .block(Block::bordered().title("SQL pane"));
+
+    // set sql_rect to the editor
 
     frame.render_widget(title, title_rect);
-    frame.render_widget(sql_paragrah, sql_rect);
+    frame.render_widget(&app.editor, sql_rect);
 }

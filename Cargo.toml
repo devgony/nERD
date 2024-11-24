@@ -14,9 +14,11 @@ documentation = "https://docs.rs/nERD"
 anyhow = "1.0.89"
 color-eyre = "0.6.3"
 gluesql-core = { git = "https://github.com/gluesql/gluesql", rev = "25309dd15a50ee061e714576079b2cd8c1fcca9c" }
-ratatui = { version = "0.28.1", features = ["all-widgets"] }
 sqlparser = "0.45.0"
-tui-scrollview = "0.4.0"
+# ratatui = { version = "0.28.1", features = ["all-widgets"] }
+ratatui = "0.29.0"
+tui-scrollview = "0.5.0"
+tui-textarea = "0.7.0"
 
 [dependencies.cursive]
 version = "0.20"

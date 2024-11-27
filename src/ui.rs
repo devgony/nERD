@@ -45,29 +45,6 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
 
     let mut scroll_view = ScrollView::new(Size::new(erd_rect.width, 100));
 
-    // let items = [
-    //     "Item 1", "Item 2", "Item 3", "Item 4", "Item 5", "Item 6", "Item 7", "Item 8",
-    // ];
-
-    // let list = List::new(items)
-    //     .block(Block::bordered().title("Table1"))
-    //     .style(Style::default().fg(Color::White))
-    //     .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
-    //     .highlight_symbol(">>")
-    //     .repeat_highlight_symbol(true)
-    //     .direction(ListDirection::TopToBottom);
-
-    // let lists = vec![
-    //     list.clone(),
-    //     list.clone(),
-    //     list.clone(),
-    //     list.clone(),
-    //     list.clone(),
-    //     list.clone(),
-    //     list.clone(),
-    //     list.clone(),
-    //     list.clone(),
-    // ];
     let mut rect_builder = RectBuilder::new(erd_rect.width);
     for list in lists {
         let rect = rect_builder.get_rect(list.len() + 2);

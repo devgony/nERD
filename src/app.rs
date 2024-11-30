@@ -1,13 +1,13 @@
 use anyhow::Result;
-use color_eyre::owo_colors::OwoColorize;
 use gluesql_core::data::Schema;
 use ratatui::{
     crossterm::event::{self, Event, KeyCode, KeyEventKind},
-    style::{Color, Modifier, Style},
-    widgets::{block::title, Block, Borders, List, ListDirection},
+    style::Style,
+    widgets::{Block, Borders},
 };
 use tui_scrollview::ScrollViewState;
 use tui_textarea::TextArea;
+use {serde::Serialize, std::fmt::Debug, thiserror::Error as ThisError};
 
 #[derive(Default)]
 enum Mode {
@@ -16,14 +16,39 @@ enum Mode {
     ERD,
 }
 
-#[derive(Default)]
 pub struct App {
     pub mode: Mode,
-    pub sql_text: String,
     pub scroll_view_state: ScrollViewState,
     pub state: AppState,
     pub editor: TextArea<'static>,
+    // how to impl default ok Result?
+    pub schemas: NerdResult<Vec<Schema>>,
 }
+
+impl Default for App {
+    fn default() -> Self {
+        Self {
+            mode: Mode::default(),
+            scroll_view_state: ScrollViewState::default(),
+            state: AppState::default(),
+            editor: TextArea::default(),
+            schemas: Ok(Vec::new()),
+        }
+    }
+}
+
+#[derive(ThisError, Serialize, Debug, PartialEq, Default)]
+pub enum Error {
+    #[error("storage: {0}")]
+    StorageMsg(String),
+
+    #[default]
+    #[error("storage: ")]
+    Two,
+}
+
+pub type NerdResult<T, E = Error> = std::result::Result<T, E>;
+
 
 #[derive(Default, PartialEq)]
 pub(crate) enum AppState {
@@ -33,7 +58,7 @@ pub(crate) enum AppState {
 }
 
 impl App {
-    pub fn new(sql_text: String) -> App {
+    pub fn new(_sql_text: String) -> App {
         let mut editor = TextArea::new(vec![
             "abc".to_string(),
             "def".to_string(),
@@ -48,16 +73,23 @@ impl App {
         );
         App {
             editor,
-            sql_text,
             ..Default::default()
         }
     }
 
-    pub fn get_schemas(&self) -> Vec<Schema> {
-        self.sql_text
+    pub fn get_schemas(&self) -> Option<Vec<Schema>> {
+        let sql_text = self.editor.lines().concat();
+
+        let schemas: Vec<Schema> = sql_text
             .split(";")
             .filter_map(|sql| Schema::from_ddl(sql).ok()) // todo!() shuold show err message if cant parse
-            .collect::<Vec<_>>()
+            .collect();
+        
+        if schemas.is_empty() {
+            None
+        } else {
+            Some(schemas)
+        }
     }
 
     pub fn handle_events(&mut self) -> Result<()> {
@@ -105,9 +137,12 @@ impl App {
 
     fn sync(&mut self) {
         // get text content from editor
-        let sql_text = self.editor.lines().concat();
+        // let sql_text = self.editor.lines().concat();
 
-        self.sql_text = sql_text;
+        // self.sql_text = sql_text;
+
+        self.get_schemas();
+
         // draw erd again
 
         // let schemas = self.get_schemas();

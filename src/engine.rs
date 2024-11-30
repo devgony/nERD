@@ -1,4 +1,3 @@
-use std::fmt::Display;
 
 use gluesql_core::{ast::DataType, data::Schema};
 

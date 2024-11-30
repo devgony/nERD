@@ -2,7 +2,7 @@ use std::borrow::BorrowMut;
 
 use ratatui::widgets::StatefulWidget;
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect, Size},
+    layout::{Constraint, Direction, Layout, Size},
     style::{Color, Modifier, Style},
     text::Text,
     widgets::{Block, Borders, List, ListDirection, Paragraph},
@@ -13,11 +13,11 @@ use tui_scrollview::ScrollView;
 use crate::{app::App, builder::RectBuilder};
 
 pub fn ui(frame: &mut Frame, app: &mut App) {
-    let schemas = app.get_schemas();
+    let schemas = app.get_schemas().unwrap_or_default();
     let lists = schemas.iter().map(|schema| {
         let column_names = schema
-            .clone()
             .column_defs
+            .clone()
             .unwrap_or_default()
             .iter()
             .map(|column_def| column_def.name.clone())

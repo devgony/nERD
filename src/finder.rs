@@ -275,7 +275,7 @@ impl Diagram {
                         self.next(&direction);
                         self.set_char(Char::Horizontal.as_char())
                     }
-                    (cur_char, direction) => {
+                    (_cur_char, direction) => {
                         // println!("cur_char: {:?}, direction: {:?}", cur_char, direction);
                         self.next(direction);
                         match direction {

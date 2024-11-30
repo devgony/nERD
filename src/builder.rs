@@ -1,4 +1,4 @@
-use ratatui::{layout::Rect, widgets::List};
+use ratatui::layout::Rect;
 
 const GAP: u16 = 4;
 const WIDTH: u16 = 20;

@@ -7,8 +7,7 @@ use app::AppState;
 use color_eyre::config::HookBuilder;
 use std::{
     error::Error,
-    io::{self, stdout, Stderr},
-    panic::{set_hook, take_hook},
+    io::stdout,
 };
 
 use ratatui::{

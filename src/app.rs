@@ -8,6 +8,7 @@ use ratatui::{
 };
 use tui_scrollview::ScrollViewState;
 use tui_textarea::TextArea;
+use {serde::Serialize, std::fmt::Debug, thiserror::Error as ThisError};
 
 #[derive(Default)]
 enum Mode {
@@ -19,11 +20,30 @@ enum Mode {
 #[derive(Default)]
 pub struct App {
     pub mode: Mode,
-    pub sql_text: String,
     pub scroll_view_state: ScrollViewState,
     pub state: AppState,
     pub editor: TextArea<'static>,
+    // how to impl default ok Result?
+    pub schemas: NerdResult<Vec<Schema>>,
 }
+
+#[derive(ThisError, Serialize, Debug, PartialEq, Default)]
+pub enum Error {
+    #[error("storage: {0}")]
+    StorageMsg(String),
+
+    #[default]
+    #[error("storage: ")]
+    Two,
+}
+
+pub type NerdResult<T, E = Error> = std::result::Result<T, E>;
+
+// impl Default for NerdResult<Vec<Schema>> {
+//     fn default() -> Self {
+//         Err(Error::StorageMsg("default".to_string()))
+//     }
+// }
 
 #[derive(Default, PartialEq)]
 pub(crate) enum AppState {
@@ -48,16 +68,18 @@ impl App {
         );
         App {
             editor,
-            sql_text,
             ..Default::default()
         }
     }
 
-    pub fn get_schemas(&self) -> Vec<Schema> {
-        self.sql_text
+    pub fn get_schemas(&self) -> Option<Vec<Schema>> {
+        let sql_text = self.editor.lines().concat();
+
+        sql_text
             .split(";")
-            .filter_map(|sql| Schema::from_ddl(sql).ok()) // todo!() shuold show err message if cant parse
-            .collect::<Vec<_>>()
+            .filter_map(|sql| Schema::from_ddl(sql)) // todo!() shuold show err message if cant parse
+            .collect::<Result<Vec<_>>>()
+            .ok()
     }
 
     pub fn handle_events(&mut self) -> Result<()> {
@@ -105,9 +127,12 @@ impl App {
 
     fn sync(&mut self) {
         // get text content from editor
-        let sql_text = self.editor.lines().concat();
+        // let sql_text = self.editor.lines().concat();
 
-        self.sql_text = sql_text;
+        // self.sql_text = sql_text;
+
+        self.get_schemas();
+
         // draw erd again
 
         // let schemas = self.get_schemas();

@@ -1058,7 +1058,10 @@ dependencies = [
  "cursive",
  "gluesql-core",
  "ratatui",
+ "serde",
+ "serde_json",
  "sqlparser 0.45.0",
+ "thiserror",
  "tui-scrollview",
  "tui-textarea",
 ]

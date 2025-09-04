@@ -150,10 +150,10 @@ CREATE TABLE Tab10 (col1 INT, col2 INT);
                 ("Tab4".to_owned(), 46, 1),
                 ("Tab5".to_owned(), 61, 1),
                 ("Tab6".to_owned(), 76, 1),
-                ("Tab7".to_owned(), 91, 1),
-                ("Tab8".to_owned(), 1, 9),
-                ("Tab9".to_owned(), 16, 9),
-                ("Tab10".to_owned(), 31, 9)
+                ("Tab7".to_owned(), 1, 10),
+                ("Tab8".to_owned(), 16, 10),
+                ("Tab9".to_owned(), 31, 10),
+                ("Tab10".to_owned(), 46, 10)
             ]
         );
     }

@@ -344,7 +344,14 @@ impl Diagram {
                 }
             }
             // (Char::Vertical, Direction::Up, Char::RightDown) => {}
-
+            
+            // Handle FkFrom and FkTo as special cases - just continue in the direction
+            (Char::FkFrom, direction, _) | (Char::FkTo, direction, _) => {
+                // FkFrom and FkTo are special markers, just continue moving
+                // Don't recurse, return None to stop
+                return Direction::None;
+            }
+            
             // vertical, up , rightdown should be handled
             x => unreachable!("{:?}", x),
             // (Char::Vertical, Direction::Right, Char::Horizontal)

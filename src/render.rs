@@ -19,7 +19,7 @@ use crate::{constants::ENTITY_WIDTH, engine::Entity};
 // │ Col2  │       │Col2  │
 // │       │       │      │
 // └───────┘       └──────┘
-fn render(mut canvas: Vec<Vec<char>>, entities: &Vec<Entity>) -> (Vec<Vec<char>>, String) {
+pub fn render(mut canvas: Vec<Vec<char>>, entities: &Vec<Entity>) -> (Vec<Vec<char>>, String) {
     for entity in entities {
         let Entity {
             x,
@@ -90,7 +90,7 @@ fn render(mut canvas: Vec<Vec<char>>, entities: &Vec<Entity>) -> (Vec<Vec<char>>
     )
 }
 
-fn render_foreign_key(
+pub fn render_foreign_key(
     mut canvas: Vec<Vec<char>>,
     entities: &Vec<Entity>,
 ) -> (Vec<Vec<char>>, String) {

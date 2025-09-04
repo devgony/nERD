@@ -1,5 +1,5 @@
 mod constants;
-mod engine;
+pub mod engine;
 mod finder;
 mod graph;
 mod render;

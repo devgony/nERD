@@ -2,5 +2,5 @@ mod constants;
 pub mod engine;
 mod finder;
 mod graph;
-mod render;
+pub mod render;
 mod util;

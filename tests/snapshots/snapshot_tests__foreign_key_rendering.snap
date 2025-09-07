@@ -6,8 +6,8 @@ expression: rendered_with_fks
  ┌──────────┐   ┌──────────┐   ┌──────────┐                                                         
  │users     │   │posts     │   │comments  │                                                         
  ├──────────┤   ├──────────┤   ├──────────┤                                                         
-│┤id        │  │┤id        │   │id        │                                                         
-││email     │  ││title     │   │content   │                                                         
-┘│name      │──┘│user_id   ├───│post_id   ├                                                         
-┘└──────────┘───└──────────┘───│user_id   ├                                                         
-                               └──────────┘
+ │id        ├←┬┐│id        ├←─┐│id        │                                                         
+ │email     │ │││title     │  ││content   │                                                         
+ │name      │ │└┤user_id   │  └┤post_id   │                                                      
+ └──────────┘ │ └──────────┘  ┌┤user_id   │                                                     
+              └───────────────┘└──────────┘                                                         

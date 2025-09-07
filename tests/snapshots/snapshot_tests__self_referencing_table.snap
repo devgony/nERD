@@ -1,0 +1,12 @@
+---
+source: tests/snapshot_tests.rs
+expression: rendered_with_fks
+---
+                                                                                                    
+ ┌──────────┐                                                                                       
+ │categories│                                                                                       
+ ├──────────┤                                                                                       
+│┤id        │                                                                                       
+││name      │                                                                                       
+┘│parent_id ├                                                                                       
+ └──────────┘

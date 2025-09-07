@@ -109,23 +109,16 @@ pub fn render_foreign_key(
                 let to_x = target_entity.x;
                 let to_y = target_entity.y + target_column_index + 3;
 
-                println!("from: {}, {}, to: {}, {}", from_x, from_y, to_x, to_y);
+                // println!("from: {}, {}, to: {}, {}", from_x, from_y, to_x, to_y);
 
-                // Draw line
+                // Draw starting connector on the right border of source entity
                 canvas[from_y][from_x] = '├';
-                // canvas[from_y][from_x + 1] = '┐';
-                // canvas[from_y + 1][from_x + 1] = '│';
-
-                // canvas[to_y][to_x] = '→';
-                // for i in (from_y)..=to_y {
-                //     for j in from_x..=to_x {
-                //         if canvas[i][j] == " " {
-
-                //         }
-                //     }
-                // }
-
-                draw_fk(from_x, from_y, to_x - 1, to_y, &mut canvas);
+                
+                // Draw ending connector on the left border of target entity  
+                canvas[to_y][to_x] = '┤';
+                
+                // Draw the connecting line from outside the source entity to outside the target entity
+                draw_fk_with_entities(from_x + 1, from_y, to_x - 1, to_y, &mut canvas, entities);
             }
         }
     }
@@ -150,8 +143,80 @@ enum Direction {
     Vertical { sign: Sign, horizontal_sign: Sign },
 }
 
-fn draw_fk(cur_x: usize, cur_y: usize, to_x: usize, to_y: usize, canvas: &mut Vec<Vec<char>>) {
-    println!("cur: {}, {}, to: {}, {}", cur_x, cur_y, to_x, to_y);
+fn draw_fk_with_entities(cur_x: usize, cur_y: usize, to_x: usize, to_y: usize, canvas: &mut Vec<Vec<char>>, entities: &Vec<Entity>) {
+    // Simple approach: draw a straight line from FK start to FK end, but allow going through entity borders
+    draw_simple_fk(cur_x, cur_y, to_x, to_y, canvas, entities);
+}
+
+fn draw_simple_fk(from_x: usize, from_y: usize, to_x: usize, to_y: usize, canvas: &mut Vec<Vec<char>>, entities: &Vec<Entity>) {
+    let mut x = from_x;
+    let mut y = from_y;
+    
+    // First, go horizontally toward the target
+    while x != to_x {
+        if x < to_x {
+            x += 1;
+        } else {
+            x -= 1;
+        }
+        
+        // Only draw if we're not inside an entity's content area
+        if !is_inside_entity_content(x, y, entities) {
+            if canvas[y][x] == ' ' {
+                canvas[y][x] = '─';
+            }
+        }
+    }
+    
+    // Then, go vertically toward the target
+    while y != to_y {
+        if y < to_y {
+            y += 1;
+        } else {
+            y -= 1;
+        }
+        
+        // Only draw if we're not inside an entity's content area
+        if !is_inside_entity_content(x, y, entities) {
+            if canvas[y][x] == ' ' {
+                canvas[y][x] = '│';
+            }
+        }
+    }
+    
+    // Draw connection at the corner if needed
+    if from_x != to_x && from_y != to_y && !is_inside_entity_content(to_x, from_y, entities) {
+        if canvas[from_y][to_x] == '─' && (from_y < to_y) {
+            canvas[from_y][to_x] = '┐';
+        } else if canvas[from_y][to_x] == '─' && (from_y > to_y) {
+            canvas[from_y][to_x] = '┘';
+        }
+    }
+}
+
+fn is_inside_entity_content(x: usize, y: usize, entities: &Vec<Entity>) -> bool {
+    for entity in entities {
+        let entity_left = entity.x;
+        let entity_right = entity.x + ENTITY_WIDTH - 1;
+        let entity_top = entity.y;
+        let entity_bottom = entity.y + entity.attributes.len() + 3;
+        
+        // Check if we're inside the content area (not on borders)
+        if x > entity_left && x < entity_right && y > entity_top && y < entity_bottom {
+            return true;
+        }
+    }
+    false
+}
+
+fn draw_fk_with_depth(cur_x: usize, cur_y: usize, to_x: usize, to_y: usize, canvas: &mut Vec<Vec<char>>, depth: usize, entities: &Vec<Entity>) {
+    // Prevent stack overflow with maximum recursion depth
+    if depth > 1000 {
+        // println!("Warning: Maximum recursion depth reached while drawing foreign key");
+        return;
+    }
+    
+    // println!("cur: {}, {}, to: {}, {}", cur_x, cur_y, to_x, to_y);
 
     let move_y =
         ((to_x as isize) - (cur_x as isize)).abs() < ((to_y as isize) - (cur_y as isize)).abs();
@@ -273,249 +338,219 @@ fn draw_fk(cur_x: usize, cur_y: usize, to_x: usize, to_y: usize, canvas: &mut Ve
         }
     }
 
-    let (cur_x, cur_y) = match canvas[next_y][next_x] {
-        ' ' => {
-            // if canvas[cur_y][cur_x] == ' ' {
-            //     if move_y {
-            //         canvas[cur_y][cur_x] = '│';
-            //     } else {
-            //         canvas[cur_y][cur_x] = '─';
-            //     }
-            // }
-
-            // if move_y {
-            //     canvas[next_y][next_x] = '│';
-            // } else {
-            //     canvas[next_y][next_x] = '─';
-            // }
-
-            // (next_x, next_y)
-            match try_direction {
-                Direction::Horizontal {
-                    sign: Sign::Positive,
-                    vertical_sign: Sign::Positive,
-                } => {
-                    if canvas[cur_y][cur_x] == '│' {
-                        canvas[cur_y][cur_x] = 'x';
-                    }
-                    canvas[next_y][next_x] = Char::Horizontal.as_char();
-                }
-                Direction::Horizontal {
-                    sign: Sign::Positive,
-                    vertical_sign: Sign::Negative,
-                } => {
-                    if canvas[cur_y][cur_x] == '│' {
-                        canvas[cur_y][cur_x] = '└';
-                    }
-                    canvas[next_y][next_x] = Char::Horizontal.as_char();
-                }
-                Direction::Horizontal {
-                    sign: Sign::Negative,
-                    vertical_sign: Sign::Positive,
-                } => {
-                    if canvas[cur_y][cur_x] == '│' {
-                        canvas[cur_y][cur_x] = '┐';
-                    }
-                    canvas[next_y][next_x] = Char::Horizontal.as_char();
-                }
-                Direction::Horizontal {
-                    sign: Sign::Negative,
-                    vertical_sign: Sign::Negative,
-                } => {
-                    if canvas[cur_y][cur_x] == '│' {
-                        canvas[cur_y][cur_x] = '┘';
-                    }
-                    canvas[next_y][next_x] = Char::Horizontal.as_char();
-                }
-                Direction::Vertical {
-                    sign: Sign::Positive,
-                    horizontal_sign: Sign::Positive,
-                } => {
-                    if canvas[cur_y][cur_x] == '─' {
-                        canvas[cur_y][cur_x] = '┐';
-                    }
-                    canvas[next_y][next_x] = Char::Vertical.as_char();
-                }
-                Direction::Vertical {
-                    sign: Sign::Positive,
-                    horizontal_sign: Sign::Negative,
-                } => {
-                    if canvas[cur_y][cur_x] == '─' {
-                        canvas[cur_y][cur_x] = '┌';
-                    }
-                    canvas[next_y][next_x] = Char::Vertical.as_char();
-                }
-                Direction::Vertical {
-                    sign: Sign::Negative,
-                    horizontal_sign: Sign::Positive,
-                } => {
-                    if canvas[cur_y][cur_x] == '─' {
-                        canvas[cur_y][cur_x] = '┘';
-                    }
-                    canvas[next_y][next_x] = Char::Vertical.as_char();
-                }
-                Direction::Vertical {
-                    sign: Sign::Negative,
-                    horizontal_sign: Sign::Negative,
-                } => {
-                    if canvas[cur_y][cur_x] == '─' {
-                        canvas[cur_y][cur_x] = '└';
-                    }
-                    canvas[next_y][next_x] = Char::Vertical.as_char();
-                }
-            };
-
-            (next_x, next_y)
+    // Check if the next position would be inside an entity (but not on its borders)
+    let is_inside_entity = |x: usize, y: usize| -> bool {
+        for entity in entities {
+            // Check if we're inside this entity's bounds (excluding borders)
+            let entity_left = entity.x;
+            let entity_right = entity.x + ENTITY_WIDTH - 1;
+            let entity_top = entity.y;
+            let entity_bottom = entity.y + entity.attributes.len() + 3; // +3 for top border, header line, separator line, and bottom border
+            
+            // Allow drawing on the borders but not inside the content area
+            if x > entity_left && x < entity_right && y > entity_top && y < entity_bottom {
+                return true;
+            }
         }
-        // '─' => {
-        //     let cur_x = if cur_x < to_x { cur_x + 1 } else { cur_x - 1 };
+        false
+    };
 
-        //     (cur_x, cur_y)
-        // }
-        // '│' => {
-        //     let cur_y = if cur_y < to_y { cur_y + 1 } else { cur_y - 1 };
-
-        //     (cur_x, cur_y)
-        // }
-        // '┌' | '┐' | '└' | '┘' => {
-        x => {
-            println!("tried: {x}");
-            let prev_char = canvas[cur_y][cur_x];
-            match try_direction {
-                Direction::Vertical {
-                    sign: Sign::Positive,
-                    horizontal_sign: Sign::Positive,
-                } => {
-                    if prev_char == '│' {
-                        canvas[cur_y][cur_x] = '└';
-                    } else {
-                        canvas[cur_y][cur_x] = '─';
-                    }
-
-                    (cur_x + 1, cur_y)
+    // If the next position would be inside an entity, we need to go around it
+    let next_is_inside_entity = is_inside_entity(next_x, next_y);
+    
+    let (cur_x, cur_y) = if next_is_inside_entity || canvas[next_y][next_x] != ' ' {
+        // We hit an obstacle or are trying to go through an entity
+        let prev_char = canvas[cur_y][cur_x];
+        match try_direction {
+            Direction::Vertical {
+                sign: Sign::Positive,
+                horizontal_sign: Sign::Positive,
+            } => {
+                if prev_char == '│' {
+                    canvas[cur_y][cur_x] = '└';
+                } else {
+                    canvas[cur_y][cur_x] = '─';
                 }
-                Direction::Vertical {
-                    sign: Sign::Positive,
-                    horizontal_sign: Sign::Negative,
-                } => {
-                    if prev_char == '│' {
-                        canvas[cur_y][cur_x] = '┘';
-                    } else {
-                        canvas[cur_y][cur_x] = '─';
-                    }
 
-                    (cur_x - 1, cur_y)
+                (cur_x + 1, cur_y)
+            }
+            Direction::Vertical {
+                sign: Sign::Positive,
+                horizontal_sign: Sign::Negative,
+            } => {
+                if prev_char == '│' {
+                    canvas[cur_y][cur_x] = '┘';
+                } else {
+                    canvas[cur_y][cur_x] = '─';
                 }
-                Direction::Vertical {
-                    sign: Sign::Negative,
-                    horizontal_sign: Sign::Positive,
-                } => {
-                    if prev_char == '│' {
-                        canvas[cur_y][cur_x] = '┌';
-                    } else {
-                        canvas[cur_y][cur_x] = '─';
-                    }
 
-                    (cur_x + 1, cur_y)
+                (cur_x - 1, cur_y)
+            }
+            Direction::Vertical {
+                sign: Sign::Negative,
+                horizontal_sign: Sign::Positive,
+            } => {
+                if prev_char == '│' {
+                    canvas[cur_y][cur_x] = '┌';
+                } else {
+                    canvas[cur_y][cur_x] = '─';
                 }
-                Direction::Vertical {
-                    sign: Sign::Negative,
-                    horizontal_sign: Sign::Negative,
-                } => {
-                    if prev_char == '│' {
-                        canvas[cur_y][cur_x] = '┐';
-                    } else {
-                        canvas[cur_y][cur_x] = '─';
-                    }
 
-                    (cur_x - 1, cur_y)
+                (cur_x + 1, cur_y)
+            }
+            Direction::Vertical {
+                sign: Sign::Negative,
+                horizontal_sign: Sign::Negative,
+            } => {
+                if prev_char == '│' {
+                    canvas[cur_y][cur_x] = '┐';
+                } else {
+                    canvas[cur_y][cur_x] = '─';
                 }
-                Direction::Horizontal {
-                    sign: Sign::Positive,
-                    vertical_sign: Sign::Positive,
-                } => {
-                    if prev_char == '─' {
-                        canvas[cur_y][cur_x] = '┐';
-                    } else {
-                        canvas[cur_y][cur_x] = '│';
+
+                (cur_x - 1, cur_y)
+            }
+            Direction::Horizontal {
+                sign: Sign::Positive,
+                vertical_sign: Sign::Positive,
+            } => {
+                if prev_char == '─' {
+                    canvas[cur_y][cur_x] = '┐';
+                } else {
+                    canvas[cur_y][cur_x] = '│';
+                    if cur_y + 1 < canvas.len() {
                         canvas[cur_y + 1][cur_x] = '└';
                     }
-
-                    (cur_x, cur_y + 1)
                 }
-                Direction::Horizontal {
-                    sign: Sign::Positive,
-                    vertical_sign: Sign::Negative,
-                } => {
-                    if prev_char == '─' {
-                        canvas[cur_y][cur_x] = '┘';
-                    } else {
-                        canvas[cur_y][cur_x] = '│';
-                    }
 
-                    (cur_x, cur_y - 1)
-                }
-                Direction::Horizontal {
-                    sign: Sign::Negative,
-                    vertical_sign: Sign::Positive,
-                } => {
-                    if prev_char == '─' {
-                        canvas[cur_y][cur_x] = '┌';
-                    } else {
-                        canvas[cur_y][cur_x] = '│';
-                    }
-
-                    (cur_x, cur_y + 1)
-                }
-                Direction::Horizontal {
-                    sign: Sign::Negative,
-                    vertical_sign: Sign::Negative,
-                } => {
-                    if prev_char == '─' {
-                        canvas[cur_y][cur_x] = '└';
-                    } else {
-                        canvas[cur_y][cur_x] = '│';
-                    }
-
-                    (cur_x, cur_y - 1)
-                }
+                (cur_x, cur_y + 1)
             }
-            // if move_y {
-            //     let prev_x = cur_x;
-            //     let (cur_x,target) = if cur_x < to_x { (cur_x + 1, '└' ) } else { ( cur_x - 1,'' ) };
-            //     if canvas[cur_y][prev_x] == '│' {
-            //         canvas[cur_y][prev_x] = '└';
-            //     }
-            //     canvas[cur_y][cur_x] = '─';
+            Direction::Horizontal {
+                sign: Sign::Positive,
+                vertical_sign: Sign::Negative,
+            } => {
+                if prev_char == '─' {
+                    canvas[cur_y][cur_x] = '┘';
+                } else {
+                    canvas[cur_y][cur_x] = '│';
+                }
 
-            //     (cur_x, cur_y)
-            // } else {
-            //     canvas[cur_y][cur_x] = '│';
-            //     let cur_y = if cur_y < to_y { cur_y + 1 } else { cur_y - 1 };
+                (cur_x, cur_y - 1)
+            }
+            Direction::Horizontal {
+                sign: Sign::Negative,
+                vertical_sign: Sign::Positive,
+            } => {
+                if prev_char == '─' {
+                    canvas[cur_y][cur_x] = '┌';
+                } else {
+                    canvas[cur_y][cur_x] = '│';
+                }
 
-            //     (cur_x, cur_y)
-            // }
-        } // '→' | '├' => todo!(),
-          // // '┬' => todo!(),
-          // // '┴' => todo!(),
-          // // '┼' => todo!(),
-          // // '┤' => todo!(),
-          // x => {
-          //     println!("warning: {x}");
+                (cur_x, cur_y + 1)
+            }
+            Direction::Horizontal {
+                sign: Sign::Negative,
+                vertical_sign: Sign::Negative,
+            } => {
+                if prev_char == '─' {
+                    canvas[cur_y][cur_x] = '└';
+                } else {
+                    canvas[cur_y][cur_x] = '│';
+                }
 
-          //     (next_x, next_y)
-          // }
+                (cur_x, cur_y - 1)
+            }
+        }
+    } else {
+        // Empty space - we can draw the line
+        match try_direction {
+            Direction::Horizontal {
+                sign: Sign::Positive,
+                vertical_sign: Sign::Positive,
+            } => {
+                if canvas[cur_y][cur_x] == '│' {
+                    canvas[cur_y][cur_x] = 'x';
+                }
+                canvas[next_y][next_x] = Char::Horizontal.as_char();
+            }
+            Direction::Horizontal {
+                sign: Sign::Positive,
+                vertical_sign: Sign::Negative,
+            } => {
+                if canvas[cur_y][cur_x] == '│' {
+                    canvas[cur_y][cur_x] = '└';
+                }
+                canvas[next_y][next_x] = Char::Horizontal.as_char();
+            }
+            Direction::Horizontal {
+                sign: Sign::Negative,
+                vertical_sign: Sign::Positive,
+            } => {
+                if canvas[cur_y][cur_x] == '│' {
+                    canvas[cur_y][cur_x] = '┐';
+                }
+                canvas[next_y][next_x] = Char::Horizontal.as_char();
+            }
+            Direction::Horizontal {
+                sign: Sign::Negative,
+                vertical_sign: Sign::Negative,
+            } => {
+                if canvas[cur_y][cur_x] == '│' {
+                    canvas[cur_y][cur_x] = '┘';
+                }
+                canvas[next_y][next_x] = Char::Horizontal.as_char();
+            }
+            Direction::Vertical {
+                sign: Sign::Positive,
+                horizontal_sign: Sign::Positive,
+            } => {
+                if canvas[cur_y][cur_x] == '─' {
+                    canvas[cur_y][cur_x] = '┐';
+                }
+                canvas[next_y][next_x] = Char::Vertical.as_char();
+            }
+            Direction::Vertical {
+                sign: Sign::Positive,
+                horizontal_sign: Sign::Negative,
+            } => {
+                if canvas[cur_y][cur_x] == '─' {
+                    canvas[cur_y][cur_x] = '┌';
+                }
+                canvas[next_y][next_x] = Char::Vertical.as_char();
+            }
+            Direction::Vertical {
+                sign: Sign::Negative,
+                horizontal_sign: Sign::Positive,
+            } => {
+                if canvas[cur_y][cur_x] == '─' {
+                    canvas[cur_y][cur_x] = '┘';
+                }
+                canvas[next_y][next_x] = Char::Vertical.as_char();
+            }
+            Direction::Vertical {
+                sign: Sign::Negative,
+                horizontal_sign: Sign::Negative,
+            } => {
+                if canvas[cur_y][cur_x] == '─' {
+                    canvas[cur_y][cur_x] = '└';
+                }
+                canvas[next_y][next_x] = Char::Vertical.as_char();
+            }
+        };
+
+        (next_x, next_y)
     };
 
     // if (cur_x == 16 && cur_y == 7) || (to_x == cur_x && to_y == cur_y) {
     // if (cur_x == 45 && cur_y == 13) || (to_x == cur_x && to_y == cur_y) {
-    println!("cur: {}, {}, to: {}, {}", cur_x, cur_y, to_x, to_y);
+    // println!("cur: {}, {}, to: {}, {}", cur_x, cur_y, to_x, to_y);
 
     if to_x == cur_x && to_y == cur_y {
         return;
     }
 
-    draw_fk(cur_x, cur_y, to_x, to_y, canvas);
+    draw_fk_with_depth(cur_x, cur_y, to_x, to_y, canvas, depth + 1, entities);
 }
 
 #[cfg(test)]

@@ -1,0 +1,15 @@
+---
+source: tests/snapshot_tests.rs
+expression: rendered_with_fks
+---
+                                                                                                                                                      
+ ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐                                                                             
+ │users     │   │categories│   │products  │   │orders    │   │order_item│                                                                             
+ ├──────────┤   ├──────────┤   ├──────────┤   ├──────────┤   ├──────────┤                                                                             
+│┤id        │  │┤id        │  │┤id        │  │┤id        │   │id        │                                                                             
+││email     │──││name      │───│name      │──┘│user_id   ├───│order_id  ├                                                                             
+││name      │  ┘│parent_id ├──┘│category_i├───│status    │───│product_id├                                                                             
+││created_at│   └──────────┘   │price     │   │total_amou│t  │quantity  │                                                                             
+│└──────────┘                  │stock_quan│ity│created_at│   │price     │                                                                             
+┘──────────────────────────────│created_by├   └──────────┘   └──────────┘                                                                             
+                               └──────────┘

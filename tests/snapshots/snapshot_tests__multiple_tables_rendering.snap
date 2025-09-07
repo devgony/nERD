@@ -1,0 +1,13 @@
+---
+source: tests/snapshot_tests.rs
+expression: rendered_string
+---
+                                                                                                    
+ ┌──────────┐   ┌──────────┐                                                                        
+ │users     │   │posts     │                                                                        
+ ├──────────┤   ├──────────┤                                                                        
+ │id        │   │id        │                                                                        
+ │email     │   │title     │                                                                        
+ │name      │   │content   │                                                                        
+ │created_at│   │user_id   │                                                                        
+ └──────────┘   └──────────┘

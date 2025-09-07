@@ -6,7 +6,7 @@ expression: rendered_with_fks
  ┌──────────┐                                                                                       
  │categories│                                                                                       
  ├──────────┤                                                                                       
- ┤id        │                                                                                       
-││name      │                                                                                       
-└│parent_id ├                                                                                       
+ │id        │                                                                                       
+ │name      │                                                                                       
+ │parent_id │                                                                                       
  └──────────┘

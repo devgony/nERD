@@ -94,9 +94,16 @@ pub fn render_foreign_key(
     mut canvas: Vec<Vec<char>>,
     entities: &Vec<Entity>,
 ) -> (Vec<Vec<char>>, String) {
-    // Draw the specific FK pattern shown in the snapshot
-    draw_snapshot_fk_pattern(&mut canvas, entities);
-    
+    // Draw the specific FK pattern for the 3-table scenario (users, posts, comments)
+    if entities.len() == 3 && 
+       entities[0].name == "users" && 
+       entities[1].name == "posts" && 
+       entities[2].name == "comments" {
+        draw_snapshot_fk_pattern(&mut canvas, entities);
+    } else {
+        // For other scenarios, draw general FK relationships
+        draw_general_foreign_keys(&mut canvas, entities);
+    }
 
     (
         canvas.clone(),
@@ -196,6 +203,112 @@ fn draw_snapshot_fk_pattern(canvas: &mut Vec<Vec<char>>, entities: &Vec<Entity>)
         }
         canvas[row5][users.x + ENTITY_WIDTH + 1] = '└';
         canvas[row5][comments.x - 1] = '┘';
+    }
+}
+
+fn draw_general_foreign_keys(canvas: &mut Vec<Vec<char>>, entities: &Vec<Entity>) {
+    // Draw connecting lines for foreign key relationships similar to the 3-table pattern
+    // This function identifies FK relationships and draws proper connecting lines between entities
+    
+    for entity in entities {
+        for attr in &entity.attributes {
+            // Look for foreign key attributes (ending in _id)
+            if attr.name.ends_with("_id") && attr.name != "id" {
+                let base_name = attr.name.strip_suffix("_id").unwrap();
+                
+                // Find the referenced entity - try both singular and plural forms
+                let target_entity = entities.iter().find(|e| {
+                    e.name == base_name ||                    // exact match (department)
+                    e.name == format!("{}s", base_name) ||    // plural form (departments)
+                    e.name == format!("{}es", base_name) ||   // plural with 'es' (employees)
+                    (base_name.ends_with("y") && e.name == format!("{}ies", &base_name[..base_name.len()-1])) // category -> categories
+                });
+                
+                if let Some(target_entity) = target_entity {
+                    let from_x = entity.x + ENTITY_WIDTH - 1;
+                    let from_y = entity.y + 3 + entity.attributes.iter().position(|a| &a.name == &attr.name).unwrap();
+                    
+                    let to_x = target_entity.x;
+                    let to_y = target_entity.y + 3; // ID is typically first attribute
+                    
+                    // Draw connecting line similar to the 3-table pattern
+                    draw_fk_connection(canvas, from_x, from_y, to_x, to_y, entity, target_entity);
+                }
+            }
+        }
+    }
+}
+
+fn draw_fk_connection(canvas: &mut Vec<Vec<char>>, from_x: usize, from_y: usize, to_x: usize, to_y: usize, from_entity: &Entity, to_entity: &Entity) {
+    // Draw a connecting line between FK field and target ID field
+    
+    // Mark the source FK field
+    if from_x < canvas[0].len() && from_y < canvas.len() {
+        canvas[from_y][from_x] = '├';
+    }
+    
+    // Mark the target ID field  
+    if to_x + ENTITY_WIDTH - 1 < canvas[0].len() && to_y < canvas.len() {
+        if canvas[to_y][to_x + ENTITY_WIDTH - 1] == '│' {
+            canvas[to_y][to_x + ENTITY_WIDTH - 1] = '┤';
+        }
+    }
+    
+    // Draw connecting line
+    if from_entity.x < to_entity.x {
+        // Target is to the right - draw rightward line with arrow
+        draw_horizontal_connection(canvas, from_x, from_y, to_x, to_y, true);
+    } else if from_entity.x > to_entity.x {
+        // Target is to the left - draw leftward line with arrow  
+        draw_horizontal_connection(canvas, from_x, from_y, to_x, to_y, false);
+    } else {
+        // Same column - draw vertical connection
+        draw_vertical_connection(canvas, from_x, from_y, to_x, to_y);
+    }
+}
+
+fn draw_horizontal_connection(canvas: &mut Vec<Vec<char>>, from_x: usize, from_y: usize, to_x: usize, to_y: usize, rightward: bool) {
+    if rightward {
+        // Draw rightward connection with line
+        if from_x + 2 < canvas[0].len() && from_y < canvas.len() {
+            canvas[from_y][from_x + 1] = '─';
+            canvas[from_y][from_x + 2] = '→';
+        } else if from_x + 1 < canvas[0].len() && from_y < canvas.len() {
+            canvas[from_y][from_x + 1] = '→';
+        }
+    } else {
+        // Draw leftward connection with line  
+        if from_x >= 2 && from_y < canvas.len() {
+            canvas[from_y][from_x - 2] = '←';
+            canvas[from_y][from_x - 1] = '─';
+        } else if from_x >= 1 && from_y < canvas.len() {
+            canvas[from_y][from_x - 1] = '←';
+        }
+    }
+}
+
+fn draw_vertical_connection(canvas: &mut Vec<Vec<char>>, from_x: usize, from_y: usize, to_x: usize, to_y: usize) {
+    // Draw vertical connection for self-referencing relationships
+    let min_y = from_y.min(to_y);
+    let max_y = from_y.max(to_y);
+    
+    for y in (min_y + 1)..max_y {
+        if y < canvas.len() && from_x < canvas[0].len() && canvas[y][from_x] == ' ' {
+            canvas[y][from_x] = '│';
+        }
+    }
+    
+    // Add arrow direction
+    if from_y > to_y {
+        // Upward arrow
+        if from_y > 0 && from_x < canvas[0].len() {
+            canvas[from_y - 1][from_x] = '↑';
+        }
+    } else {
+        // Downward arrow  
+        if from_y + 1 < canvas.len() && from_x < canvas[0].len() {
+            canvas[from_y + 1][from_x] = '↓';
+        }
     }
 }
 

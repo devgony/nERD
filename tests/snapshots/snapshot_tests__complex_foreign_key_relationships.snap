@@ -1,0 +1,16 @@
+---
+source: tests/snapshot_tests.rs
+expression: rendered_with_fks
+---
+                                                                                                                                                      
+ ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐                                                              
+ │employees │   │department│   │projects  │   │assignment│   │skills    │   │employee_s│ills                                                          
+ ├──────────┤   ├──────────┤   ├──────────┤   ├──────────┤   ├──────────┤   ├──────────┤                                                              
+ │id        ┤   │id        ┤   │id        ┤   │id        │   │id        ┤   │id        │                                                              
+ │name      │   │name      │   │name      │   │employee←─├   │name      │   │employee←─├                                                              
+ │email     │   │budget    │   │start_date│   │project_←─├   │category  │   │skill_id←─├                                                              
+ │manager_id│   │manager_id│   │end_date  │   │role      │   └──────────┘   │proficienc│                                                              
+ │department├─→ │parent_dep│_id│departme←─├id │hours_allo│ated              │certified │                                                              
+ └──────────┘   └──────────┘   │lead_id   │   └──────────┘                  └──────────┘                                                              
+                               │created_by│                                                                                                           
+                               └──────────┘

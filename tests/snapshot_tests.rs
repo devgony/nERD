@@ -249,3 +249,99 @@ fn test_table_with_many_columns() {
     
     assert_snapshot!(rendered_string);
 }
+
+#[test]
+fn test_complex_foreign_key_relationships() {
+    // This test demonstrates a complex corporate database with multiple foreign keys:
+    // - Employees table with self-referencing manager_id
+    // - Departments with manager reference to employees and self-reference
+    // - Projects with multiple foreign keys
+    // - Assignments creating many-to-many relationships
+    // - Skills and employee_skills for many-to-many with attributes
+    let sql = r#"
+        CREATE TABLE employees (
+            id INT PRIMARY KEY,
+            name TEXT,
+            email TEXT,
+            manager_id INT,
+            department_id INT,
+            FOREIGN KEY (manager_id) REFERENCES employees(id),
+            FOREIGN KEY (department_id) REFERENCES departments(id)
+        );
+
+        CREATE TABLE departments (
+            id INT PRIMARY KEY,
+            name TEXT,
+            budget DECIMAL,
+            manager_id INT,
+            parent_dept_id INT,
+            FOREIGN KEY (manager_id) REFERENCES employees(id),
+            FOREIGN KEY (parent_dept_id) REFERENCES departments(id)
+        );
+
+        CREATE TABLE projects (
+            id INT PRIMARY KEY,
+            name TEXT,
+            start_date DATE,
+            end_date DATE,
+            department_id INT,
+            lead_id INT,
+            created_by INT,
+            FOREIGN KEY (department_id) REFERENCES departments(id),
+            FOREIGN KEY (lead_id) REFERENCES employees(id),
+            FOREIGN KEY (created_by) REFERENCES employees(id)
+        );
+
+        CREATE TABLE assignments (
+            id INT PRIMARY KEY,
+            employee_id INT,
+            project_id INT,
+            role TEXT,
+            hours_allocated INT,
+            FOREIGN KEY (employee_id) REFERENCES employees(id),
+            FOREIGN KEY (project_id) REFERENCES projects(id)
+        );
+
+        CREATE TABLE skills (
+            id INT PRIMARY KEY,
+            name TEXT,
+            category TEXT
+        );
+
+        CREATE TABLE employee_skills (
+            id INT PRIMARY KEY,
+            employee_id INT,
+            skill_id INT,
+            proficiency INT,
+            certified BOOLEAN,
+            FOREIGN KEY (employee_id) REFERENCES employees(id),
+            FOREIGN KEY (skill_id) REFERENCES skills(id)
+        );
+    "#;
+
+    let schemas: Vec<Schema> = sql
+        .split(";")
+        .map(|sql| sql.trim())
+        .filter(|sql| !sql.is_empty())
+        .filter_map(|sql| Schema::from_ddl(sql).ok())
+        .collect();
+    
+    let entities = into_entities(schemas);
+
+    let canvas_width = 150;
+    let canvas_height = 50;
+    let canvas: Vec<Vec<char>> = vec![vec![' '; canvas_width]; canvas_height];
+
+    let (canvas, _) = render(canvas, &entities);
+    let (canvas, rendered_with_fks) = render_foreign_key(canvas, &entities);
+
+    // Convert to string
+    let rendered_with_fks = canvas
+        .iter()
+        .map(|row| row.iter().collect::<String>())
+        .collect::<Vec<String>>()
+        .join("
+");
+
+    assert_snapshot!(rendered_with_fks);
+}

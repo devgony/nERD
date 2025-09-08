@@ -130,7 +130,7 @@ impl DiagramRenderer {
                 schema.entities.get(&relationship.from_table),
                 schema.entities.get(&relationship.to_table),
             ) {
-                self.render_relationship_line(f, from_entity, to_entity, relationship, area);
+                self.render_relationship_line(f, from_entity, to_entity, relationship, schema, area);
             }
         }
     }
@@ -141,6 +141,7 @@ impl DiagramRenderer {
         from_entity: &Entity,
         to_entity: &Entity,
         relationship: &Relationship,
+        schema: &Schema,
         area: Rect,
     ) {
         let from_area = self.calculate_entity_area(from_entity, area);
@@ -156,7 +157,13 @@ impl DiagramRenderer {
             &to_area
         );
 
-        self.draw_connection_line(f, from_point, to_point, area);
+        // Collect all entity areas to avoid drawing through them
+        let entity_areas: Vec<Rect> = schema.entities
+            .values()
+            .map(|entity| self.calculate_entity_area(entity, area))
+            .collect();
+            
+        self.draw_connection_line_avoiding_entities(f, from_point, to_point, &entity_areas, area);
     }
 
 
@@ -180,31 +187,31 @@ impl DiagramRenderer {
         let to_center_y = to_area.y + to_area.height / 2;
 
         let from_point = if to_center_x > from_center_x {
-            // Connect from right edge at column height
-            (from_area.x + from_area.width - 1, from_column_y)
+            // Connect from right edge at column height (outside the border)
+            (from_area.x + from_area.width, from_column_y)
         } else if to_center_x < from_center_x {
-            // Connect from left edge at column height
-            (from_area.x, from_column_y)
+            // Connect from left edge at column height (outside the border)
+            (from_area.x.saturating_sub(1), from_column_y)
         } else if to_center_y > from_center_y {
-            // Connect from bottom edge
-            (from_center_x, from_area.y + from_area.height - 1)
+            // Connect from bottom edge (outside the border)
+            (from_center_x, from_area.y + from_area.height)
         } else {
-            // Connect from top edge
-            (from_center_x, from_area.y)
+            // Connect from top edge (outside the border)
+            (from_center_x, from_area.y.saturating_sub(1))
         };
 
         let to_point = if from_center_x > to_center_x {
-            // Connect to right edge at column height
-            (to_area.x + to_area.width - 1, to_column_y)
+            // Connect to right edge at column height (outside the border)
+            (to_area.x + to_area.width, to_column_y)
         } else if from_center_x < to_center_x {
-            // Connect to left edge at column height
-            (to_area.x, to_column_y)
+            // Connect to left edge at column height (outside the border)
+            (to_area.x.saturating_sub(1), to_column_y)
         } else if from_center_y > to_center_y {
-            // Connect to bottom edge
-            (to_center_x, to_area.y + to_area.height - 1)
+            // Connect to bottom edge (outside the border)
+            (to_center_x, to_area.y + to_area.height)
         } else {
-            // Connect to top edge
-            (to_center_x, to_area.y)
+            // Connect to top edge (outside the border)
+            (to_center_x, to_area.y.saturating_sub(1))
         };
 
         (from_point, to_point)
@@ -225,39 +232,42 @@ impl DiagramRenderer {
         inner_y + column_index as u16
     }
 
-    fn draw_connection_line(
+    fn draw_connection_line_avoiding_entities(
         &self,
         f: &mut Frame,
         from: (u16, u16),
         to: (u16, u16),
+        entity_areas: &[Rect],
         area: Rect,
     ) {
-        // Draw a proper line between the two points
-        self.draw_line_between_points(f, from, to, area);
+        // Draw a proper line between the two points, avoiding entity areas
+        self.draw_line_between_points_avoiding_entities(f, from, to, entity_areas, area);
     }
 
-    fn draw_line_between_points(
+    fn draw_line_between_points_avoiding_entities(
         &self,
         f: &mut Frame,
         from: (u16, u16),
         to: (u16, u16),
+        entity_areas: &[Rect],
         area: Rect,
     ) {
         // For smoother lines, use a 3-segment approach:
         // 1. Horizontal/vertical segment from start
-        // 2. Diagonal segment (if needed)
+        // 2. Diagonal segment (if needed)  
         // 3. Horizontal/vertical segment to end
-        self.draw_smooth_line(f, from, to, area);
+        self.draw_smooth_line_avoiding_entities(f, from, to, entity_areas, area);
         
         // Draw arrow heads to show direction (from FK to PK)
         self.draw_arrow_head(f, to, from, area);
     }
 
-    fn draw_smooth_line(
+    fn draw_smooth_line_avoiding_entities(
         &self,
         f: &mut Frame,
         from: (u16, u16),
         to: (u16, u16),
+        entity_areas: &[Rect],
         area: Rect,
     ) {
         let dx = to.0 as i32 - from.0 as i32;
@@ -270,134 +280,26 @@ impl DiagramRenderer {
         // Handle pure horizontal or vertical lines directly
         if dx == 0 {
             // Pure vertical line
-            self.draw_vertical_line(f, from, to, area);
+            self.draw_vertical_line_avoiding_entities(f, from, to, entity_areas, area);
             return;
         }
         
         if dy == 0 {
             // Pure horizontal line
-            self.draw_horizontal_line(f, from, to, area);
+            self.draw_horizontal_line_avoiding_entities(f, from, to, entity_areas, area);
             return;
         }
         
         // For small distances, use direct line
         if dx.abs() <= 2 && dy.abs() <= 2 {
-            self.draw_direct_line(f, from, to, area);
+            self.draw_direct_line_avoiding_entities(f, from, to, entity_areas, area);
             return;
         }
         
         // For longer distances, use smooth 3-segment routing
-        self.draw_three_segment_line(f, from, to, area);
+        self.draw_three_segment_line_avoiding_entities(f, from, to, entity_areas, area);
     }
 
-    fn draw_direct_line(
-        &self,
-        f: &mut Frame,
-        from: (u16, u16),
-        to: (u16, u16),
-        area: Rect,
-    ) {
-        let dx = to.0 as i32 - from.0 as i32;
-        let dy = to.1 as i32 - from.1 as i32;
-        let steps = dx.abs().max(dy.abs());
-        
-        if steps == 0 {
-            return;
-        }
-        
-        let x_step = dx as f32 / steps as f32;
-        let y_step = dy as f32 / steps as f32;
-        
-        for i in 0..=steps {
-            let x = (from.0 as f32 + i as f32 * x_step) as u16;
-            let y = (from.1 as f32 + i as f32 * y_step) as u16;
-            
-            let line_char = self.get_line_character_for_direction(dx, dy);
-            self.draw_line_segment(f, x, y, line_char, area);
-        }
-    }
-
-    fn draw_three_segment_line(
-        &self,
-        f: &mut Frame,
-        from: (u16, u16),
-        to: (u16, u16),
-        area: Rect,
-    ) {
-        let dx = to.0 as i32 - from.0 as i32;
-        let dy = to.1 as i32 - from.1 as i32;
-        
-        // Choose routing style based on the connection pattern
-        if dx.abs() > dy.abs() {
-            // Horizontal-dominant: go horizontal first, then vertical, then horizontal
-            let mid_x = from.0 as i32 + dx / 2;
-            let mid1 = (mid_x as u16, from.1);
-            let mid2 = (mid_x as u16, to.1);
-            
-            // Only draw segments if they have meaningful length
-            if from.0 != mid1.0 {
-                self.draw_horizontal_line(f, from, mid1, area);
-            }
-            if mid1.1 != mid2.1 {
-                self.draw_vertical_line(f, mid1, mid2, area);
-            }
-            if mid2.0 != to.0 {
-                self.draw_horizontal_line(f, mid2, to, area);
-            }
-            
-            // Draw corners only where segments actually meet and change direction
-            if from.0 != mid1.0 && mid1.1 != mid2.1 {
-                self.draw_corner(f, mid1, from, mid2, area);
-            }
-            if mid1.1 != mid2.1 && mid2.0 != to.0 {
-                self.draw_corner(f, mid2, mid1, to, area);
-            }
-        } else {
-            // Vertical-dominant: go vertical first, then horizontal, then vertical
-            let mid_y = from.1 as i32 + dy / 2;
-            let mid1 = (from.0, mid_y as u16);
-            let mid2 = (to.0, mid_y as u16);
-            
-            // Only draw segments if they have meaningful length
-            if from.1 != mid1.1 {
-                self.draw_vertical_line(f, from, mid1, area);
-            }
-            if mid1.0 != mid2.0 {
-                self.draw_horizontal_line(f, mid1, mid2, area);
-            }
-            if mid2.1 != to.1 {
-                self.draw_vertical_line(f, mid2, to, area);
-            }
-            
-            // Draw corners only where segments actually meet and change direction
-            if from.1 != mid1.1 && mid1.0 != mid2.0 {
-                self.draw_corner(f, mid1, from, mid2, area);
-            }
-            if mid1.0 != mid2.0 && mid2.1 != to.1 {
-                self.draw_corner(f, mid2, mid1, to, area);
-            }
-        }
-    }
-
-    fn draw_horizontal_line(&self, f: &mut Frame, from: (u16, u16), to: (u16, u16), area: Rect) {
-        let start_x = from.0.min(to.0);
-        let end_x = from.0.max(to.0);
-        let y = from.1;
-        
-        for x in start_x..=end_x {
-            self.draw_line_segment(f, x, y, "─", area);
-        }
-    }
-
-    fn draw_vertical_line(&self, f: &mut Frame, from: (u16, u16), to: (u16, u16), area: Rect) {
-        let start_y = from.1.min(to.1);
-        let end_y = from.1.max(to.1);
-        let x = from.0;
-        
-        for y in start_y..=end_y {
-            self.draw_line_segment(f, x, y, "│", area);
-        }
-    }
 
     fn draw_corner(
         &self,
@@ -436,6 +338,130 @@ impl DiagramRenderer {
         self.draw_line_segment(f, corner.0, corner.1, corner_char, area);
     }
 
+    // Entity-avoiding versions of line drawing methods
+    fn draw_horizontal_line_avoiding_entities(&self, f: &mut Frame, from: (u16, u16), to: (u16, u16), entity_areas: &[Rect], area: Rect) {
+        let start_x = from.0.min(to.0);
+        let end_x = from.0.max(to.0);
+        let y = from.1;
+        
+        for x in start_x..=end_x {
+            if !self.point_intersects_any_entity(x, y, entity_areas) {
+                self.draw_line_segment(f, x, y, "─", area);
+            }
+        }
+    }
+
+    fn draw_vertical_line_avoiding_entities(&self, f: &mut Frame, from: (u16, u16), to: (u16, u16), entity_areas: &[Rect], area: Rect) {
+        let start_y = from.1.min(to.1);
+        let end_y = from.1.max(to.1);
+        let x = from.0;
+        
+        for y in start_y..=end_y {
+            if !self.point_intersects_any_entity(x, y, entity_areas) {
+                self.draw_line_segment(f, x, y, "│", area);
+            }
+        }
+    }
+
+    fn draw_direct_line_avoiding_entities(
+        &self,
+        f: &mut Frame,
+        from: (u16, u16),
+        to: (u16, u16),
+        entity_areas: &[Rect],
+        area: Rect,
+    ) {
+        let dx = to.0 as i32 - from.0 as i32;
+        let dy = to.1 as i32 - from.1 as i32;
+        let steps = dx.abs().max(dy.abs());
+        
+        if steps == 0 {
+            return;
+        }
+        
+        let x_step = dx as f32 / steps as f32;
+        let y_step = dy as f32 / steps as f32;
+        
+        for i in 0..=steps {
+            let x = (from.0 as f32 + i as f32 * x_step) as u16;
+            let y = (from.1 as f32 + i as f32 * y_step) as u16;
+            
+            if !self.point_intersects_any_entity(x, y, entity_areas) {
+                let line_char = self.get_line_character_for_direction(dx, dy);
+                self.draw_line_segment(f, x, y, line_char, area);
+            }
+        }
+    }
+
+    fn draw_three_segment_line_avoiding_entities(
+        &self,
+        f: &mut Frame,
+        from: (u16, u16),
+        to: (u16, u16),
+        entity_areas: &[Rect],
+        area: Rect,
+    ) {
+        let dx = to.0 as i32 - from.0 as i32;
+        let dy = to.1 as i32 - from.1 as i32;
+        
+        // Choose routing style based on the connection pattern
+        if dx.abs() > dy.abs() {
+            // Horizontal-dominant: go horizontal first, then vertical, then horizontal
+            let mid_x = from.0 as i32 + dx / 2;
+            let mid1 = (mid_x as u16, from.1);
+            let mid2 = (mid_x as u16, to.1);
+            
+            // Only draw segments if they have meaningful length
+            if from.0 != mid1.0 {
+                self.draw_horizontal_line_avoiding_entities(f, from, mid1, entity_areas, area);
+            }
+            if mid1.1 != mid2.1 {
+                self.draw_vertical_line_avoiding_entities(f, mid1, mid2, entity_areas, area);
+            }
+            if mid2.0 != to.0 {
+                self.draw_horizontal_line_avoiding_entities(f, mid2, to, entity_areas, area);
+            }
+            
+            // Draw corners only where segments actually meet and change direction
+            if from.0 != mid1.0 && mid1.1 != mid2.1 && !self.point_intersects_any_entity(mid1.0, mid1.1, entity_areas) {
+                self.draw_corner(f, mid1, from, mid2, area);
+            }
+            if mid1.1 != mid2.1 && mid2.0 != to.0 && !self.point_intersects_any_entity(mid2.0, mid2.1, entity_areas) {
+                self.draw_corner(f, mid2, mid1, to, area);
+            }
+        } else {
+            // Vertical-dominant: go vertical first, then horizontal, then vertical
+            let mid_y = from.1 as i32 + dy / 2;
+            let mid1 = (from.0, mid_y as u16);
+            let mid2 = (to.0, mid_y as u16);
+            
+            // Only draw segments if they have meaningful length
+            if from.1 != mid1.1 {
+                self.draw_vertical_line_avoiding_entities(f, from, mid1, entity_areas, area);
+            }
+            if mid1.0 != mid2.0 {
+                self.draw_horizontal_line_avoiding_entities(f, mid1, mid2, entity_areas, area);
+            }
+            if mid2.1 != to.1 {
+                self.draw_vertical_line_avoiding_entities(f, mid2, to, entity_areas, area);
+            }
+            
+            // Draw corners only where segments actually meet and change direction
+            if from.1 != mid1.1 && mid1.0 != mid2.0 && !self.point_intersects_any_entity(mid1.0, mid1.1, entity_areas) {
+                self.draw_corner(f, mid1, from, mid2, area);
+            }
+            if mid1.0 != mid2.0 && mid2.1 != to.1 && !self.point_intersects_any_entity(mid2.0, mid2.1, entity_areas) {
+                self.draw_corner(f, mid2, mid1, to, area);
+            }
+        }
+    }
+
+    fn point_intersects_any_entity(&self, x: u16, y: u16, entity_areas: &[Rect]) -> bool {
+        entity_areas.iter().any(|entity_area| {
+            self.point_is_inside_entity(x, y, entity_area)
+        })
+    }
+
     fn get_line_character_for_direction(&self, dx: i32, dy: i32) -> &'static str {
         if dx.abs() > dy.abs() {
             "─" // Horizontal
@@ -463,6 +489,13 @@ impl DiagramRenderer {
                 f.render_widget(line_widget, point_area);
             }
         }
+    }
+
+    fn point_is_inside_entity(&self, x: u16, y: u16, entity_area: &Rect) -> bool {
+        x >= entity_area.x && 
+        x <= entity_area.x + entity_area.width - 1 &&
+        y >= entity_area.y && 
+        y <= entity_area.y + entity_area.height - 1
     }
     
     fn draw_arrow_head(
@@ -776,5 +809,57 @@ mod tests {
         let dy_vert = to_vertical.1 as i32 - from_vertical.1 as i32;
         assert_eq!(dx_vert, 0); // Vertical line  
         assert_ne!(dy_vert, 0); // But has vertical distance
+    }
+
+    #[test]
+    fn test_entity_penetration_avoidance() {
+        use crate::models::Column;
+        
+        let renderer = DiagramRenderer::new(800, 600);
+        
+        // Create a test entity that would block line segments
+        let _blocking_entity = Entity {
+            name: "blocker".to_string(),
+            columns: vec![
+                Column {
+                    name: "id".to_string(),
+                    data_type: "INT".to_string(),
+                    nullable: false,
+                    is_primary_key: true,
+                    is_foreign_key: false,
+                    references: None,
+                }
+            ],
+            position: Position { x: 50.0, y: 50.0 },
+            dimensions: Dimensions { width: 20, height: 5 },
+        };
+        
+        // Create entity area that would be in the path of a line
+        let entity_area = Rect {
+            x: 15, // Entity positioned at x=15-35
+            y: 10, // Entity positioned at y=10-15  
+            width: 20,
+            height: 5,
+        };
+        
+        // Test point inside entity should be detected
+        assert!(renderer.point_is_inside_entity(20, 12, &entity_area));
+        assert!(renderer.point_is_inside_entity(25, 14, &entity_area));
+        
+        // Test points outside entity should not be detected
+        assert!(!renderer.point_is_inside_entity(10, 12, &entity_area)); // Left of entity
+        assert!(!renderer.point_is_inside_entity(40, 12, &entity_area)); // Right of entity
+        assert!(!renderer.point_is_inside_entity(20, 8, &entity_area));  // Above entity
+        assert!(!renderer.point_is_inside_entity(20, 20, &entity_area)); // Below entity
+        
+        // Test boundary conditions (entity borders should be considered inside for collision)
+        assert!(renderer.point_is_inside_entity(15, 10, &entity_area)); // Top-left corner
+        assert!(renderer.point_is_inside_entity(34, 14, &entity_area)); // Bottom-right corner (width-1, height-1)
+        
+        // Test points just outside boundaries  
+        assert!(!renderer.point_is_inside_entity(14, 10, &entity_area)); // Just left of entity
+        assert!(!renderer.point_is_inside_entity(35, 14, &entity_area)); // Just right of entity
+        assert!(!renderer.point_is_inside_entity(15, 9, &entity_area));  // Just above entity
+        assert!(!renderer.point_is_inside_entity(15, 15, &entity_area)); // Just below entity
     }
 }

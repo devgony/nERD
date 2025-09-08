@@ -45,7 +45,7 @@ cargo run
    - The app starts with a pre-loaded e-commerce schema for immediate exploration!
 2. **Explore the sample**: Use `Tab`/`Shift+Tab` to select entities, arrow keys to move them
 3. **View the SQL**: Press `s` to see the SQL that generated the current diagram
-4. **Try editing**: Modify the SQL in editor mode, then `Ctrl+Enter` to sync changes
+4. **Try editing**: Modify the SQL in editor mode, then `Ctrl+S` to sync changes
 5. **Generate SQL**: Press `g` to generate SQL from your current diagram layout
 6. **Create entities**: Press `n` to create a new entity
 7. **Get help**: Press `?` for complete keybinding reference
@@ -76,7 +76,7 @@ cargo run
 ### SQL Editor
 | Key | Action |
 |-----|--------|
-| `Ctrl+Enter` | Sync SQL changes to diagram |
+| `Ctrl+S` | Sync SQL changes to diagram |
 | `Type` | Enter/edit SQL statements |
 | `g` | Generate SQL from current diagram |
 
@@ -118,7 +118,7 @@ You can immediately start exploring by pressing `Tab` to select entities and usi
        content TEXT
    );
    ```
-3. **Import**: Press `Ctrl+Enter` to parse and visualize
+3. **Import**: Press `Ctrl+S` to parse and visualize
 4. **Adjust layout**: Use arrow keys to position entities
 5. **Export**: Press `g` to generate updated SQL
 

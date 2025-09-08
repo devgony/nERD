@@ -126,7 +126,7 @@ CREATE TABLE order_items (
             KeyCode::Char('q') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.should_quit = true;
             }
-            KeyCode::Enter if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.sync_sql_changes();
             }
             KeyCode::Char(c) => {

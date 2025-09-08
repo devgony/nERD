@@ -566,7 +566,7 @@ pub fn render_help_screen(f: &mut Frame, area: Rect) {
         Line::from("  Ctrl+D/Del - Delete selected entity"),
         Line::from(""),
         Line::from("SQL Editor:"),
-        Line::from("  Ctrl+Enter - Sync SQL changes to diagram"),
+        Line::from("  Ctrl+S     - Sync SQL changes to diagram"),
         Line::from("  Type       - Enter/edit SQL statements"),
         Line::from("  g          - Generate SQL from current diagram"),
         Line::from(""),
@@ -598,7 +598,7 @@ pub fn render_help_screen(f: &mut Frame, area: Rect) {
 
 pub fn render_sql_editor(f: &mut Frame, content: &str, area: Rect) {
     let instructions = if content.is_empty() {
-        "Enter SQL CREATE TABLE statements here.\nPress Ctrl+Enter to parse and apply.\nPress Esc to return to diagram view."
+        "Enter SQL CREATE TABLE statements here.\nPress Ctrl+S to parse and apply.\nPress Esc to return to diagram view."
     } else {
         ""
     };

@@ -69,7 +69,7 @@ fn ui(f: &mut ratatui::Frame, app: &App) {
         style::{Color, Style},
         widgets::{Block, Borders, Paragraph},
     };
-    use render::{DiagramRenderer, render_help_screen, render_sql_editor, render_entity_creator};
+    use render::{DiagramRenderer, render_help_screen, render_sql_editor_with_vim, render_entity_creator};
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -86,7 +86,7 @@ fn ui(f: &mut ratatui::Frame, app: &App) {
             renderer.render(f, &app.schema, chunks[0], &app.selected_entity);
         }
         app::AppMode::SqlEditor => {
-            render_sql_editor(f, &app.sql_content, chunks[0]);
+            render_sql_editor_with_vim(f, &app.sql_content, app.vim_mode, app.cursor_position, chunks[0]);
         }
         app::AppMode::EntityCreator => {
             render_entity_creator(f, &app.entity_creator_buffer, chunks[0]);

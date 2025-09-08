@@ -565,10 +565,27 @@ pub fn render_help_screen(f: &mut Frame, area: Rect) {
         Line::from("  ↑↓←→       - Move selected entity"),
         Line::from("  Ctrl+D/Del - Delete selected entity"),
         Line::from(""),
-        Line::from("SQL Editor:"),
+        Line::from("SQL Editor (VIM Mode):"),
         Line::from("  Ctrl+S     - Sync SQL changes to diagram"),
-        Line::from("  Type       - Enter/edit SQL statements"),
         Line::from("  g          - Generate SQL from current diagram"),
+        Line::from(""),
+        Line::from("VIM Normal Mode:"),
+        Line::from("  i          - Enter INSERT mode"),
+        Line::from("  a          - Enter INSERT mode after cursor"),
+        Line::from("  A          - Enter INSERT mode at end of line"),
+        Line::from("  I          - Enter INSERT mode at beginning of line"),
+        Line::from("  o          - Insert new line after current line"),
+        Line::from("  O          - Insert new line before current line"),
+        Line::from("  h/j/k/l    - Move cursor left/down/up/right"),
+        Line::from("  w/b        - Move word forward/backward"),
+        Line::from("  0/$        - Move to beginning/end of line"),
+        Line::from("  x/X        - Delete character at/before cursor"),
+        Line::from("  d          - Delete current line"),
+        Line::from(""),
+        Line::from("VIM Insert Mode:"),
+        Line::from("  ESC        - Return to NORMAL mode"),
+        Line::from("  Arrow keys - Move cursor"),
+        Line::from("  Type       - Insert text at cursor"),
         Line::from(""),
         Line::from("Symbols:"),
         Line::from("  🗝         - Primary key column"),
@@ -596,23 +613,33 @@ pub fn render_help_screen(f: &mut Frame, area: Rect) {
     f.render_widget(help, centered_area);
 }
 
-pub fn render_sql_editor(f: &mut Frame, content: &str, area: Rect) {
+pub fn render_sql_editor_with_vim(f: &mut Frame, content: &str, vim_mode: crate::app::VimMode, cursor_position: usize, area: Rect) {
+    use crate::app::VimMode;
+    
+    let vim_mode_text = match vim_mode {
+        VimMode::Normal => "-- NORMAL --",
+        VimMode::Insert => "-- INSERT --",
+    };
+    
+    let (line, col) = get_line_column_from_position(content, cursor_position);
+    
     let instructions = if content.is_empty() {
-        "Enter SQL CREATE TABLE statements here.\nPress Ctrl+S to parse and apply.\nPress Esc to return to diagram view."
+        format!("Enter SQL CREATE TABLE statements here.\nPress 'i' to enter INSERT mode, ESC for NORMAL mode.\nPress Ctrl+S to parse and apply.\nPress Esc in NORMAL mode to return to diagram view.\n\n{} | Line: {} Col: {}", vim_mode_text, line + 1, col + 1)
     } else {
-        ""
+        format!("{} | Line: {} Col: {}", vim_mode_text, line + 1, col + 1)
     };
     
     let display_content = if content.is_empty() {
-        instructions
+        &instructions
     } else {
+        // Show content with cursor position indicator
         content
     };
 
     let sql_text = Paragraph::new(display_content)
         .block(
             Block::default()
-                .title("SQL Editor")
+                .title("SQL Editor (VIM Mode)")
                 .title_style(Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::Green)),
@@ -625,6 +652,29 @@ pub fn render_sql_editor(f: &mut Frame, content: &str, area: Rect) {
 
     f.render_widget(sql_text, area);
 }
+
+fn get_line_column_from_position(content: &str, position: usize) -> (usize, usize) {
+    let mut line = 0;
+    let mut col = 0;
+    let mut pos = 0;
+    
+    for ch in content.chars() {
+        if pos >= position {
+            break;
+        }
+        
+        if ch == '\n' {
+            line += 1;
+            col = 0;
+        } else {
+            col += 1;
+        }
+        pos += ch.len_utf8();
+    }
+    
+    (line, col)
+}
+
 
 pub fn render_entity_creator(f: &mut Frame, buffer: &str, area: Rect) {
     let instructions = "Enter entity name and press Enter to create.\nPress Esc to cancel.";

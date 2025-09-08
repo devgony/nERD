@@ -12,12 +12,19 @@ pub enum AppMode {
     EntityCreator,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum VimMode {
+    Normal,
+    Insert,
+}
+
 pub struct App {
     pub schema: Schema,
     pub mode: AppMode,
     pub selected_entity: Option<String>,
     pub sql_content: String,
-    pub _cursor_position: (u16, u16),
+    pub vim_mode: VimMode,
+    pub cursor_position: usize,
     pub should_quit: bool,
     pub layout_engine: LayoutEngine,
     pub entity_creator_buffer: String,
@@ -75,7 +82,8 @@ CREATE TABLE order_items (
             mode: AppMode::DiagramView,
             selected_entity: None,
             sql_content: sample_sql,
-            _cursor_position: (0, 0),
+            vim_mode: VimMode::Normal,
+            cursor_position: 0,
             should_quit: false,
             layout_engine: LayoutEngine::new(800.0, 600.0),
             entity_creator_buffer: String::new(),
@@ -121,6 +129,13 @@ CREATE TABLE order_items (
     }
 
     fn handle_sql_editor_key(&mut self, key: KeyEvent) {
+        match self.vim_mode {
+            VimMode::Normal => self.handle_vim_normal_mode(key),
+            VimMode::Insert => self.handle_vim_insert_mode(key),
+        }
+    }
+
+    fn handle_vim_normal_mode(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Esc => self.mode = AppMode::DiagramView,
             KeyCode::Char('q') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -129,14 +144,107 @@ CREATE TABLE order_items (
             KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.sync_sql_changes();
             }
+            
+            // VIM normal mode commands
+            KeyCode::Char('i') => {
+                self.vim_mode = VimMode::Insert;
+            }
+            KeyCode::Char('a') => {
+                self.vim_mode = VimMode::Insert;
+                self.cursor_position = self.cursor_position.saturating_add(1).min(self.sql_content.len());
+            }
+            KeyCode::Char('A') => {
+                self.vim_mode = VimMode::Insert;
+                // Move to end of current line
+                self.move_to_end_of_line();
+            }
+            KeyCode::Char('I') => {
+                self.vim_mode = VimMode::Insert;
+                // Move to beginning of current line
+                self.move_to_beginning_of_line();
+            }
+            KeyCode::Char('o') => {
+                self.vim_mode = VimMode::Insert;
+                self.insert_new_line_after();
+            }
+            KeyCode::Char('O') => {
+                self.vim_mode = VimMode::Insert;
+                self.insert_new_line_before();
+            }
+            
+            // Movement commands
+            KeyCode::Char('h') | KeyCode::Left => {
+                self.cursor_position = self.cursor_position.saturating_sub(1);
+            }
+            KeyCode::Char('l') | KeyCode::Right => {
+                self.cursor_position = self.cursor_position.saturating_add(1).min(self.sql_content.len());
+            }
+            KeyCode::Char('j') | KeyCode::Down => {
+                self.move_cursor_down();
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                self.move_cursor_up();
+            }
+            KeyCode::Char('w') => {
+                self.move_word_forward();
+            }
+            KeyCode::Char('b') => {
+                self.move_word_backward();
+            }
+            KeyCode::Char('0') => {
+                self.move_to_beginning_of_line();
+            }
+            KeyCode::Char('$') => {
+                self.move_to_end_of_line();
+            }
+            
+            // Delete commands
+            KeyCode::Char('x') => {
+                self.delete_char_at_cursor();
+            }
+            KeyCode::Char('X') => {
+                self.delete_char_before_cursor();
+            }
+            KeyCode::Char('d') => {
+                // Simple implementation: dd deletes current line
+                // In a full vim implementation, this would handle more complex delete operations
+                self.delete_current_line();
+            }
+            
+            _ => {}
+        }
+    }
+
+    fn handle_vim_insert_mode(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc => {
+                self.vim_mode = VimMode::Normal;
+                // Move cursor back one position when exiting insert mode (vim behavior)
+                self.cursor_position = self.cursor_position.saturating_sub(1);
+            }
+            KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.sync_sql_changes();
+            }
             KeyCode::Char(c) => {
-                self.sql_content.push(c);
+                self.insert_char_at_cursor(c);
             }
             KeyCode::Backspace => {
-                self.sql_content.pop();
+                self.delete_char_before_cursor();
             }
             KeyCode::Enter => {
-                self.sql_content.push('\n');
+                self.insert_char_at_cursor('\n');
+            }
+            KeyCode::Left => {
+                self.cursor_position = self.cursor_position.saturating_sub(1);
+            }
+            KeyCode::Right => {
+                self.cursor_position = self.cursor_position.saturating_add(1).min(self.sql_content.len());
+            }
+            KeyCode::Up => {
+                self.move_cursor_up();
+            }
+            KeyCode::Down => {
+                self.move_cursor_down();
             }
             _ => {}
         }
@@ -294,5 +402,182 @@ CREATE TABLE order_items (
             self.schema.entities.insert(entity_name.clone(), new_entity);
             self.selected_entity = Some(entity_name);
         }
+    }
+
+    // VIM helper methods for cursor movement and text manipulation
+    fn insert_char_at_cursor(&mut self, c: char) {
+        if self.cursor_position <= self.sql_content.len() {
+            self.sql_content.insert(self.cursor_position, c);
+            self.cursor_position += c.len_utf8();
+        }
+    }
+
+    fn delete_char_at_cursor(&mut self) {
+        if self.cursor_position < self.sql_content.len() {
+            self.sql_content.remove(self.cursor_position);
+        }
+    }
+
+    fn delete_char_before_cursor(&mut self) {
+        if self.cursor_position > 0 {
+            self.cursor_position -= 1;
+            if self.cursor_position < self.sql_content.len() {
+                self.sql_content.remove(self.cursor_position);
+            }
+        }
+    }
+
+    fn move_cursor_up(&mut self) {
+        let lines: Vec<&str> = self.sql_content.split('\n').collect();
+        if lines.is_empty() {
+            return;
+        }
+
+        let (current_line, col_in_line) = self.get_line_and_column();
+        if current_line > 0 {
+            let prev_line_len = lines[current_line - 1].len();
+            let new_col = col_in_line.min(prev_line_len);
+            self.cursor_position = self.get_position_from_line_col(current_line - 1, new_col);
+        }
+    }
+
+    fn move_cursor_down(&mut self) {
+        let lines: Vec<&str> = self.sql_content.split('\n').collect();
+        let (current_line, col_in_line) = self.get_line_and_column();
+        
+        if current_line < lines.len() - 1 {
+            let next_line_len = lines[current_line + 1].len();
+            let new_col = col_in_line.min(next_line_len);
+            self.cursor_position = self.get_position_from_line_col(current_line + 1, new_col);
+        }
+    }
+
+    fn move_to_beginning_of_line(&mut self) {
+        let (current_line, _) = self.get_line_and_column();
+        self.cursor_position = self.get_position_from_line_col(current_line, 0);
+    }
+
+    fn move_to_end_of_line(&mut self) {
+        let lines: Vec<&str> = self.sql_content.split('\n').collect();
+        let (current_line, _) = self.get_line_and_column();
+        if current_line < lines.len() {
+            let line_len = lines[current_line].len();
+            self.cursor_position = self.get_position_from_line_col(current_line, line_len);
+        }
+    }
+
+    fn move_word_forward(&mut self) {
+        let chars: Vec<char> = self.sql_content.chars().collect();
+        let mut pos = self.cursor_position;
+        
+        // Skip current word
+        while pos < chars.len() && chars[pos].is_alphanumeric() {
+            pos += 1;
+        }
+        
+        // Skip whitespace
+        while pos < chars.len() && chars[pos].is_whitespace() {
+            pos += 1;
+        }
+        
+        self.cursor_position = pos.min(self.sql_content.len());
+    }
+
+    fn move_word_backward(&mut self) {
+        if self.cursor_position == 0 {
+            return;
+        }
+        
+        let chars: Vec<char> = self.sql_content.chars().collect();
+        let mut pos = self.cursor_position.saturating_sub(1);
+        
+        // Skip whitespace
+        while pos > 0 && chars[pos].is_whitespace() {
+            pos = pos.saturating_sub(1);
+        }
+        
+        // Skip to beginning of word
+        while pos > 0 && chars[pos.saturating_sub(1)].is_alphanumeric() {
+            pos = pos.saturating_sub(1);
+        }
+        
+        self.cursor_position = pos;
+    }
+
+    fn insert_new_line_after(&mut self) {
+        self.move_to_end_of_line();
+        self.insert_char_at_cursor('\n');
+    }
+
+    fn insert_new_line_before(&mut self) {
+        self.move_to_beginning_of_line();
+        self.insert_char_at_cursor('\n');
+        self.cursor_position = self.cursor_position.saturating_sub(1);
+    }
+
+    fn delete_current_line(&mut self) {
+        let (current_line, _) = self.get_line_and_column();
+        let lines: Vec<String> = self.sql_content.split('\n').map(|s| s.to_string()).collect();
+        
+        if current_line < lines.len() {
+            let mut new_lines = lines;
+            new_lines.remove(current_line);
+            self.sql_content = new_lines.join("\n");
+            
+            // Adjust cursor position
+            if current_line > 0 && !new_lines.is_empty() {
+                self.cursor_position = self.get_position_from_line_col(current_line.saturating_sub(1), 0);
+            } else {
+                self.cursor_position = 0;
+            }
+        }
+    }
+
+    fn get_line_and_column(&self) -> (usize, usize) {
+        let mut line = 0;
+        let mut col = 0;
+        let mut pos = 0;
+        
+        for ch in self.sql_content.chars() {
+            if pos >= self.cursor_position {
+                break;
+            }
+            
+            if ch == '\n' {
+                line += 1;
+                col = 0;
+            } else {
+                col += 1;
+            }
+            pos += ch.len_utf8();
+        }
+        
+        (line, col)
+    }
+
+    fn get_position_from_line_col(&self, target_line: usize, target_col: usize) -> usize {
+        let mut line = 0;
+        let mut col = 0;
+        let mut pos = 0;
+        
+        for ch in self.sql_content.chars() {
+            if line == target_line && col == target_col {
+                return pos;
+            }
+            
+            if line > target_line {
+                return pos;
+            }
+            
+            if ch == '\n' {
+                line += 1;
+                col = 0;
+            } else {
+                col += 1;
+            }
+            pos += ch.len_utf8();
+        }
+        
+        pos
     }
 }

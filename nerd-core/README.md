@@ -42,11 +42,13 @@ cargo run
 ## Quick Start
 
 1. **Launch the application**: `cargo run`
-2. **Create entities**: Press `n` to create a new entity
-3. **Import SQL**: Press `s` to enter SQL editor, then `Ctrl+Enter` to parse
-4. **Navigate entities**: Use `Tab`/`Shift+Tab` to select, arrow keys to move
-5. **Generate SQL**: Press `g` to generate SQL from your current diagram
-6. **Get help**: Press `?` for complete keybinding reference
+   - The app starts with a pre-loaded e-commerce schema for immediate exploration!
+2. **Explore the sample**: Use `Tab`/`Shift+Tab` to select entities, arrow keys to move them
+3. **View the SQL**: Press `s` to see the SQL that generated the current diagram
+4. **Try editing**: Modify the SQL in editor mode, then `Ctrl+Enter` to sync changes
+5. **Generate SQL**: Press `g` to generate SQL from your current diagram layout
+6. **Create entities**: Press `n` to create a new entity
+7. **Get help**: Press `?` for complete keybinding reference
 
 ## Keybindings
 
@@ -77,6 +79,24 @@ cargo run
 | `Ctrl+Enter` | Sync SQL changes to diagram |
 | `Type` | Enter/edit SQL statements |
 | `g` | Generate SQL from current diagram |
+
+## Pre-loaded Sample Schema
+
+When you first launch nERD, it comes with a sample e-commerce schema already loaded:
+
+- **users** - Customer accounts with login credentials  
+- **categories** - Product categorization
+- **products** - Items for sale with foreign key to categories
+- **orders** - Customer orders with foreign key to users
+- **order_items** - Order details with foreign keys to orders and products
+
+This demonstrates the foreign key relationships:
+- `products.category_id` → `categories.id`
+- `orders.user_id` → `users.id`  
+- `order_items.order_id` → `orders.id`
+- `order_items.product_id` → `products.id`
+
+You can immediately start exploring by pressing `Tab` to select entities and using arrow keys to rearrange them!
 
 ## Example Usage
 

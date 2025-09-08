@@ -103,13 +103,23 @@ fn ui(f: &mut ratatui::Frame, app: &App) {
         app::AppMode::EntityCreator => "New Entity",
     };
 
-    let status_bar = Paragraph::new(format!(
-        "Mode: {} | Entities: {} | Press '?' for help | Press 'q' to quit",
-        mode_text,
-        app.schema.entities.len()
-    ))
-    .block(Block::default().borders(Borders::ALL))
-    .style(Style::default().fg(Color::Yellow));
+    let status_message = if app.schema.entities.len() > 0 {
+        format!(
+            "Mode: {} | Entities: {} | Sample E-commerce Schema Loaded | Press '?' for help | Press 'q' to quit",
+            mode_text,
+            app.schema.entities.len()
+        )
+    } else {
+        format!(
+            "Mode: {} | Entities: {} | Press '?' for help | Press 'q' to quit",
+            mode_text,
+            app.schema.entities.len()
+        )
+    };
+
+    let status_bar = Paragraph::new(status_message)
+        .block(Block::default().borders(Borders::ALL))
+        .style(Style::default().fg(Color::Yellow));
     
     f.render_widget(status_bar, chunks[1]);
 }

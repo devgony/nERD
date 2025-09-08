@@ -28,18 +28,61 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
-        Self {
+        let sample_sql = r#"-- Sample E-commerce Schema
+CREATE TABLE users (
+    id INT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE categories (
+    id INT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    description TEXT
+);
+
+CREATE TABLE products (
+    id INT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    price DECIMAL(10,2) NOT NULL,
+    category_id INT NOT NULL,
+    stock_quantity INT DEFAULT 0
+);
+
+CREATE TABLE orders (
+    id INT PRIMARY KEY,
+    user_id INT NOT NULL,
+    status VARCHAR(50) DEFAULT 'pending',
+    total_amount DECIMAL(10,2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE order_items (
+    id INT PRIMARY KEY,
+    order_id INT NOT NULL,
+    product_id INT NOT NULL,
+    quantity INT NOT NULL,
+    price DECIMAL(10,2) NOT NULL
+);"#.to_string();
+
+        let mut app = Self {
             schema: Schema::new(),
             mode: AppMode::DiagramView,
             selected_entity: None,
-            sql_content: String::new(),
+            sql_content: sample_sql,
             _cursor_position: (0, 0),
             should_quit: false,
             layout_engine: LayoutEngine::new(800.0, 600.0),
             entity_creator_buffer: String::new(),
             schema_sync: SchemaSync::new(),
             last_generated_sql: String::new(),
-        }
+        };
+
+        // Parse the sample SQL and create the initial diagram
+        app.parse_and_apply_sql();
+        app
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) {

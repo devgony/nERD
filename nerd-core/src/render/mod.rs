@@ -32,7 +32,7 @@ impl DiagramRenderer {
     }
 
     fn render_empty_state(&self, f: &mut Frame, area: Rect) {
-        let empty_message = Paragraph::new("No entities to display. Import SQL schema to begin.")
+        let empty_message = Paragraph::new("Loading sample schema... Press 's' to view SQL or 'r' to refresh layout.")
             .style(Style::default().fg(Color::DarkGray))
             .block(Block::default().borders(Borders::ALL).title("ERD Diagram"));
         f.render_widget(empty_message, area);

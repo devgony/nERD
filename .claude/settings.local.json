@@ -9,7 +9,9 @@
       "Bash(cargo insta:*)",
       "Bash(cat:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Read(//Users/henry/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sqlparser-0.52.0/**)",
+      "Bash(cargo:*)"
     ],
     "deny": [],
     "ask": []

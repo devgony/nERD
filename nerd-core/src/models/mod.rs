@@ -19,7 +19,7 @@ pub struct Column {
     pub references: Option<ForeignKeyReference>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ForeignKeyReference {
     pub table: String,
     pub column: String,
@@ -34,7 +34,7 @@ pub struct Relationship {
     pub relationship_type: RelationshipType,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub enum RelationshipType {
     OneToOne,
     OneToMany,

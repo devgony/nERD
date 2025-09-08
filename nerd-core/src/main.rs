@@ -3,6 +3,7 @@ mod models;
 mod parser;
 mod layout;
 mod render;
+mod sync;
 
 use anyhow::Result;
 use app::App;

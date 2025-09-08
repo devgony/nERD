@@ -1,6 +1,7 @@
 use crate::models::{Schema, Column, Entity, Position, Dimensions};
 use crate::parser::SqlParser;
 use crate::layout::LayoutEngine;
+use crate::sync::SchemaSync;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use anyhow::Result;
 
@@ -21,6 +22,8 @@ pub struct App {
     pub should_quit: bool,
     pub layout_engine: LayoutEngine,
     pub entity_creator_buffer: String,
+    pub schema_sync: SchemaSync,
+    pub last_generated_sql: String,
 }
 
 impl App {
@@ -34,6 +37,8 @@ impl App {
             should_quit: false,
             layout_engine: LayoutEngine::new(800.0, 600.0),
             entity_creator_buffer: String::new(),
+            schema_sync: SchemaSync::new(),
+            last_generated_sql: String::new(),
         }
     }
 
@@ -54,6 +59,8 @@ impl App {
             KeyCode::Char('n') => self.mode = AppMode::EntityCreator,
             KeyCode::Char('i') => self.import_sql(),
             KeyCode::Char('r') => self.refresh_layout(),
+            KeyCode::Char('g') => self.generate_sql_from_schema(),
+            KeyCode::Char('v') => self.validate_schema(),
             KeyCode::Tab => self.cycle_selected_entity(),
             KeyCode::BackTab => self.cycle_selected_entity_reverse(),
             KeyCode::Delete | KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -74,7 +81,7 @@ impl App {
                 self.should_quit = true;
             }
             KeyCode::Enter if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.parse_and_apply_sql();
+                self.sync_sql_changes();
             }
             KeyCode::Char(c) => {
                 self.sql_content.push(c);
@@ -189,6 +196,27 @@ impl App {
             self.schema = new_schema;
             self.mode = AppMode::DiagramView;
         }
+    }
+
+    fn sync_sql_changes(&mut self) {
+        if let Ok(has_changes) = self.schema_sync.merge_sql_changes(&mut self.schema, &self.sql_content) {
+            if has_changes {
+                self.layout_engine.layout_entities(&mut self.schema);
+                self.mode = AppMode::DiagramView;
+            }
+        }
+    }
+
+    fn generate_sql_from_schema(&mut self) {
+        self.sql_content = self.schema_sync.generate_sql(&self.schema);
+        self.last_generated_sql = self.sql_content.clone();
+        self.mode = AppMode::SqlEditor;
+    }
+
+    fn validate_schema(&mut self) {
+        let _errors = self.schema_sync.validate_schema(&self.schema);
+        // For now, just refresh layout - in a full implementation we'd show validation errors
+        self.refresh_layout();
     }
 
     fn refresh_layout(&mut self) {

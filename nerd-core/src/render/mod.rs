@@ -243,10 +243,49 @@ impl DiagramRenderer {
         to: (u16, u16),
         area: Rect,
     ) {
+        // For smoother lines, use a 3-segment approach:
+        // 1. Horizontal/vertical segment from start
+        // 2. Diagonal segment (if needed)
+        // 3. Horizontal/vertical segment to end
+        self.draw_smooth_line(f, from, to, area);
+        
+        // Draw arrow heads to show direction (from FK to PK)
+        self.draw_arrow_head(f, to, from, area);
+    }
+
+    fn draw_smooth_line(
+        &self,
+        f: &mut Frame,
+        from: (u16, u16),
+        to: (u16, u16),
+        area: Rect,
+    ) {
         let dx = to.0 as i32 - from.0 as i32;
         let dy = to.1 as i32 - from.1 as i32;
         
-        // Use Bresenham's line algorithm for proper line drawing
+        if dx == 0 && dy == 0 {
+            return;
+        }
+        
+        // For small distances, use direct line
+        if dx.abs() <= 2 && dy.abs() <= 2 {
+            self.draw_direct_line(f, from, to, area);
+            return;
+        }
+        
+        // For longer distances, use smooth 3-segment routing
+        self.draw_three_segment_line(f, from, to, area);
+    }
+
+    fn draw_direct_line(
+        &self,
+        f: &mut Frame,
+        from: (u16, u16),
+        to: (u16, u16),
+        area: Rect,
+    ) {
+        let dx = to.0 as i32 - from.0 as i32;
+        let dy = to.1 as i32 - from.1 as i32;
         let steps = dx.abs().max(dy.abs());
         
         if steps == 0 {
@@ -260,35 +299,141 @@ impl DiagramRenderer {
             let x = (from.0 as f32 + i as f32 * x_step) as u16;
             let y = (from.1 as f32 + i as f32 * y_step) as u16;
             
-            if x < area.x + area.width && y < area.y + area.height {
-                let point_area = Rect {
-                    x,
-                    y,
-                    width: 1,
-                    height: 1,
-                };
-                
-                // Choose line character based on direction
-                let line_char = if dx.abs() > dy.abs() {
-                    if dx > 0 { "─" } else { "─" }
-                } else if dy.abs() > dx.abs() {
-                    if dy > 0 { "│" } else { "│" }
-                } else {
-                    // Diagonal
-                    if (dx > 0 && dy > 0) || (dx < 0 && dy < 0) { "╲" } else { "╱" }
-                };
-                
-                let line_widget = Paragraph::new(line_char)
-                    .style(Style::default().fg(Color::Red));
-                
-                if point_area.intersects(area) {
-                    f.render_widget(line_widget, point_area);
-                }
+            let line_char = self.get_line_character_for_direction(dx, dy);
+            self.draw_line_segment(f, x, y, line_char, area);
+        }
+    }
+
+    fn draw_three_segment_line(
+        &self,
+        f: &mut Frame,
+        from: (u16, u16),
+        to: (u16, u16),
+        area: Rect,
+    ) {
+        let dx = to.0 as i32 - from.0 as i32;
+        let dy = to.1 as i32 - from.1 as i32;
+        
+        // Choose routing style based on the connection pattern
+        if dx.abs() > dy.abs() {
+            // Horizontal-dominant: go horizontal first, then vertical, then horizontal
+            let mid_x = from.0 as i32 + dx / 2;
+            let mid1 = (mid_x as u16, from.1);
+            let mid2 = (mid_x as u16, to.1);
+            
+            // Segment 1: horizontal from start to middle
+            self.draw_horizontal_line(f, from, mid1, area);
+            // Segment 2: vertical from middle to target height
+            self.draw_vertical_line(f, mid1, mid2, area);
+            // Segment 3: horizontal to end
+            self.draw_horizontal_line(f, mid2, to, area);
+            
+            // Draw corners
+            self.draw_corner(f, mid1, from, mid2, area);
+            self.draw_corner(f, mid2, mid1, to, area);
+        } else {
+            // Vertical-dominant: go vertical first, then horizontal, then vertical
+            let mid_y = from.1 as i32 + dy / 2;
+            let mid1 = (from.0, mid_y as u16);
+            let mid2 = (to.0, mid_y as u16);
+            
+            // Segment 1: vertical from start to middle
+            self.draw_vertical_line(f, from, mid1, area);
+            // Segment 2: horizontal from middle to target x
+            self.draw_horizontal_line(f, mid1, mid2, area);
+            // Segment 3: vertical to end
+            self.draw_vertical_line(f, mid2, to, area);
+            
+            // Draw corners
+            self.draw_corner(f, mid1, from, mid2, area);
+            self.draw_corner(f, mid2, mid1, to, area);
+        }
+    }
+
+    fn draw_horizontal_line(&self, f: &mut Frame, from: (u16, u16), to: (u16, u16), area: Rect) {
+        let start_x = from.0.min(to.0);
+        let end_x = from.0.max(to.0);
+        let y = from.1;
+        
+        for x in start_x..=end_x {
+            self.draw_line_segment(f, x, y, "─", area);
+        }
+    }
+
+    fn draw_vertical_line(&self, f: &mut Frame, from: (u16, u16), to: (u16, u16), area: Rect) {
+        let start_y = from.1.min(to.1);
+        let end_y = from.1.max(to.1);
+        let x = from.0;
+        
+        for y in start_y..=end_y {
+            self.draw_line_segment(f, x, y, "│", area);
+        }
+    }
+
+    fn draw_corner(
+        &self,
+        f: &mut Frame,
+        corner: (u16, u16),
+        from: (u16, u16),
+        to: (u16, u16),
+        area: Rect,
+    ) {
+        let dx1 = corner.0 as i32 - from.0 as i32;
+        let dy1 = corner.1 as i32 - from.1 as i32;
+        let dx2 = to.0 as i32 - corner.0 as i32;
+        let dy2 = to.1 as i32 - corner.1 as i32;
+        
+        // Determine corner character based on incoming and outgoing directions
+        let corner_char = match (dx1.signum(), dy1.signum(), dx2.signum(), dy2.signum()) {
+            // Coming from left, going down
+            (1, 0, 0, 1) => "┐",
+            // Coming from left, going up  
+            (1, 0, 0, -1) => "┘",
+            // Coming from right, going down
+            (-1, 0, 0, 1) => "┌",
+            // Coming from right, going up
+            (-1, 0, 0, -1) => "└",
+            // Coming from top, going right
+            (0, 1, 1, 0) => "└",
+            // Coming from top, going left
+            (0, 1, -1, 0) => "┘",
+            // Coming from bottom, going right
+            (0, -1, 1, 0) => "┌",
+            // Coming from bottom, going left
+            (0, -1, -1, 0) => "┐",
+            _ => "┼", // Default intersection
+        };
+        
+        self.draw_line_segment(f, corner.0, corner.1, corner_char, area);
+    }
+
+    fn get_line_character_for_direction(&self, dx: i32, dy: i32) -> &'static str {
+        if dx.abs() > dy.abs() {
+            "─" // Horizontal
+        } else if dy.abs() > dx.abs() {
+            "│" // Vertical
+        } else {
+            // Pure diagonal
+            if (dx > 0 && dy > 0) || (dx < 0 && dy < 0) { "╲" } else { "╱" }
+        }
+    }
+
+    fn draw_line_segment(&self, f: &mut Frame, x: u16, y: u16, char: &str, area: Rect) {
+        if x < area.x + area.width && y < area.y + area.height {
+            let point_area = Rect {
+                x,
+                y,
+                width: 1,
+                height: 1,
+            };
+            
+            let line_widget = Paragraph::new(char)
+                .style(Style::default().fg(Color::Red));
+            
+            if point_area.intersects(area) {
+                f.render_widget(line_widget, point_area);
             }
         }
-        
-        // Draw arrow heads to show direction (from FK to PK)
-        self.draw_arrow_head(f, to, from, area);
     }
     
     fn draw_arrow_head(
@@ -367,10 +512,10 @@ pub fn render_help_screen(f: &mut Frame, area: Rect) {
         Line::from("  🗝         - Primary key column"),
         Line::from("  🔗         - Foreign key column"),
         Line::from("  ?          - Nullable column"),
-        Line::from("  ─│╲╱►◄▲▼   - Red relationship lines with arrows"),
+        Line::from("  ─│┌┐└┘►◄▲▼ - Smooth red relationship lines with corners"),
         Line::from(""),
         Line::from("Selected entities are highlighted in yellow."),
-        Line::from("Red relationship lines connect exact columns (FK → PK)."),
+        Line::from("Smooth red relationship lines connect exact columns (FK → PK)."),
         Line::from("Press any key to return."),
     ];
 

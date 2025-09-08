@@ -2,6 +2,7 @@ mod app;
 mod models;
 mod parser;
 mod layout;
+mod render;
 
 use anyhow::Result;
 use app::App;
@@ -67,6 +68,7 @@ fn ui(f: &mut ratatui::Frame, app: &App) {
         style::{Color, Style},
         widgets::{Block, Borders, Paragraph},
     };
+    use render::{DiagramRenderer, render_help_screen, render_sql_editor};
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -77,44 +79,29 @@ fn ui(f: &mut ratatui::Frame, app: &App) {
         ])
         .split(f.area());
 
-    let main_block = Block::default()
-        .title(match app.mode {
-            app::AppMode::DiagramView => "ERD Diagram View",
-            app::AppMode::SqlEditor => "SQL Editor",
-            app::AppMode::Help => "Help",
-        })
-        .borders(Borders::ALL);
-
-    let content = match app.mode {
+    match app.mode {
         app::AppMode::DiagramView => {
-            if app.schema.entities.is_empty() {
-                "No entities to display. Press 's' to enter SQL editor."
-            } else {
-                "Entities will be displayed here. Press Tab to select, 's' for SQL editor, '?' for help."
-            }
+            let renderer = DiagramRenderer::new(800, 600);
+            renderer.render(f, &app.schema, chunks[0], &app.selected_entity);
         }
         app::AppMode::SqlEditor => {
-            "SQL Editor - Press Esc to return to diagram view"
+            render_sql_editor(f, &app._sql_content, chunks[0]);
         }
         app::AppMode::Help => {
-            "Help:\n\
-             q - Quit\n\
-             s - SQL Editor\n\
-             Tab - Select next entity\n\
-             ? - This help\n\
-             Esc - Return to diagram view"
+            render_help_screen(f, chunks[0]);
         }
+    }
+
+    let mode_text = match app.mode {
+        app::AppMode::DiagramView => "Diagram",
+        app::AppMode::SqlEditor => "SQL Editor", 
+        app::AppMode::Help => "Help",
     };
 
-    let paragraph = Paragraph::new(content)
-        .block(main_block)
-        .style(Style::default().fg(Color::White));
-    
-    f.render_widget(paragraph, chunks[0]);
-
     let status_bar = Paragraph::new(format!(
-        "Mode: {:?} | Press '?' for help | Press 'q' to quit",
-        app.mode
+        "Mode: {} | Entities: {} | Press '?' for help | Press 'q' to quit",
+        mode_text,
+        app.schema.entities.len()
     ))
     .block(Block::default().borders(Borders::ALL))
     .style(Style::default().fg(Color::Yellow));

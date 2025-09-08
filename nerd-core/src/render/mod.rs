@@ -206,16 +206,26 @@ pub fn render_help_screen(f: &mut Frame, area: Rect) {
     let help_text = vec![
         Line::from("nERD - Terminal ERD Tool"),
         Line::from(""),
-        Line::from("Key Bindings:"),
+        Line::from("Navigation:"),
         Line::from("  q          - Quit application"),
         Line::from("  s          - Switch to SQL editor mode"),
-        Line::from("  d          - Switch to diagram view mode"),
+        Line::from("  n          - Create new entity"),
+        Line::from("  i          - Import SQL (or switch to editor)"),
+        Line::from("  r          - Refresh/re-layout diagram"),
+        Line::from("  ?          - Show this help screen"),
+        Line::from("  Esc        - Return to diagram view"),
+        Line::from(""),
+        Line::from("Entity Selection:"),
         Line::from("  Tab        - Select next entity"),
         Line::from("  Shift+Tab  - Select previous entity"),
-        Line::from("  ?          - Show this help screen"),
-        Line::from("  Esc        - Return to previous mode"),
+        Line::from("  ↑↓←→       - Move selected entity"),
+        Line::from("  Ctrl+D/Del - Delete selected entity"),
         Line::from(""),
-        Line::from("Entity Information:"),
+        Line::from("SQL Editor:"),
+        Line::from("  Ctrl+Enter - Parse and apply SQL"),
+        Line::from("  Type       - Enter SQL CREATE statements"),
+        Line::from(""),
+        Line::from("Symbols:"),
         Line::from("  🗝         - Primary key column"),
         Line::from("  🔗         - Foreign key column"),
         Line::from("  ?          - Nullable column"),
@@ -240,7 +250,19 @@ pub fn render_help_screen(f: &mut Frame, area: Rect) {
 }
 
 pub fn render_sql_editor(f: &mut Frame, content: &str, area: Rect) {
-    let sql_text = Paragraph::new(content)
+    let instructions = if content.is_empty() {
+        "Enter SQL CREATE TABLE statements here.\nPress Ctrl+Enter to parse and apply.\nPress Esc to return to diagram view."
+    } else {
+        ""
+    };
+    
+    let display_content = if content.is_empty() {
+        instructions
+    } else {
+        content
+    };
+
+    let sql_text = Paragraph::new(display_content)
         .block(
             Block::default()
                 .title("SQL Editor")
@@ -248,9 +270,36 @@ pub fn render_sql_editor(f: &mut Frame, content: &str, area: Rect) {
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::Green)),
         )
-        .style(Style::default().fg(Color::White));
+        .style(if content.is_empty() { 
+            Style::default().fg(Color::DarkGray) 
+        } else { 
+            Style::default().fg(Color::White) 
+        });
 
     f.render_widget(sql_text, area);
+}
+
+pub fn render_entity_creator(f: &mut Frame, buffer: &str, area: Rect) {
+    let instructions = "Enter entity name and press Enter to create.\nPress Esc to cancel.";
+    let display_text = if buffer.is_empty() {
+        format!("{}\n\nEntity name: _", instructions)
+    } else {
+        format!("{}\n\nEntity name: {}_", instructions, buffer)
+    };
+
+    let text = Paragraph::new(display_text)
+        .block(
+            Block::default()
+                .title("Create New Entity")
+                .title_style(Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD))
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Magenta)),
+        )
+        .style(Style::default().fg(Color::White));
+
+    let centered_area = centered_rect(50, 30, area);
+    f.render_widget(Clear, centered_area);
+    f.render_widget(text, centered_area);
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {

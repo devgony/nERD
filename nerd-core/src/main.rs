@@ -68,7 +68,7 @@ fn ui(f: &mut ratatui::Frame, app: &App) {
         style::{Color, Style},
         widgets::{Block, Borders, Paragraph},
     };
-    use render::{DiagramRenderer, render_help_screen, render_sql_editor};
+    use render::{DiagramRenderer, render_help_screen, render_sql_editor, render_entity_creator};
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -85,7 +85,10 @@ fn ui(f: &mut ratatui::Frame, app: &App) {
             renderer.render(f, &app.schema, chunks[0], &app.selected_entity);
         }
         app::AppMode::SqlEditor => {
-            render_sql_editor(f, &app._sql_content, chunks[0]);
+            render_sql_editor(f, &app.sql_content, chunks[0]);
+        }
+        app::AppMode::EntityCreator => {
+            render_entity_creator(f, &app.entity_creator_buffer, chunks[0]);
         }
         app::AppMode::Help => {
             render_help_screen(f, chunks[0]);
@@ -96,6 +99,7 @@ fn ui(f: &mut ratatui::Frame, app: &App) {
         app::AppMode::DiagramView => "Diagram",
         app::AppMode::SqlEditor => "SQL Editor", 
         app::AppMode::Help => "Help",
+        app::AppMode::EntityCreator => "New Entity",
     };
 
     let status_bar = Paragraph::new(format!(

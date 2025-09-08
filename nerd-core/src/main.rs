@@ -1,6 +1,7 @@
 mod app;
 mod models;
 mod parser;
+mod layout;
 
 use anyhow::Result;
 use app::App;

@@ -1,7 +1,6 @@
 ---
 source: tests/snapshot_tests.rs
-expression: rendered_with_fks
----
+expression: rendered_with_fk---
                                                                                                                                                       
  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐                                                              
  │employees │   │department│   │projects  │   │assignment│   │skills    │   │employee_s│ills                                                          

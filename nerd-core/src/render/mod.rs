@@ -2,7 +2,6 @@ use crate::models::{Entity, Schema};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    symbols,
     text::Line,
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
     Frame,
@@ -146,16 +145,48 @@ impl DiagramRenderer {
         let from_area = self.calculate_entity_area(from_entity, area);
         let to_area = self.calculate_entity_area(to_entity, area);
 
-        let from_center = (
-            from_area.x + from_area.width / 2,
-            from_area.y + from_area.height / 2,
-        );
-        let to_center = (
-            to_area.x + to_area.width / 2,
-            to_area.y + to_area.height / 2,
-        );
+        // Calculate connection points on entity edges instead of centers
+        let (from_point, to_point) = self.calculate_connection_points(&from_area, &to_area);
 
-        self.draw_connection_line(f, from_center, to_center, area);
+        self.draw_connection_line(f, from_point, to_point, area);
+    }
+
+    fn calculate_connection_points(&self, from_area: &Rect, to_area: &Rect) -> ((u16, u16), (u16, u16)) {
+        let from_center_x = from_area.x + from_area.width / 2;
+        let from_center_y = from_area.y + from_area.height / 2;
+        let to_center_x = to_area.x + to_area.width / 2;
+        let to_center_y = to_area.y + to_area.height / 2;
+
+        // Determine which edges to connect based on relative positions
+        let from_point = if to_center_x > from_center_x {
+            // Connect from right edge
+            (from_area.x + from_area.width - 1, from_center_y)
+        } else if to_center_x < from_center_x {
+            // Connect from left edge
+            (from_area.x, from_center_y)
+        } else if to_center_y > from_center_y {
+            // Connect from bottom edge
+            (from_center_x, from_area.y + from_area.height - 1)
+        } else {
+            // Connect from top edge
+            (from_center_x, from_area.y)
+        };
+
+        let to_point = if from_center_x > to_center_x {
+            // Connect to right edge
+            (to_area.x + to_area.width - 1, to_center_y)
+        } else if from_center_x < to_center_x {
+            // Connect to left edge
+            (to_area.x, to_center_y)
+        } else if from_center_y > to_center_y {
+            // Connect to bottom edge
+            (to_center_x, to_area.y + to_area.height - 1)
+        } else {
+            // Connect to top edge
+            (to_center_x, to_area.y)
+        };
+
+        (from_point, to_point)
     }
 
     fn draw_connection_line(
@@ -165,26 +196,94 @@ impl DiagramRenderer {
         to: (u16, u16),
         area: Rect,
     ) {
-        let line_char = if from.0 == to.0 {
-            symbols::line::VERTICAL
-        } else if from.1 == to.1 {
-            symbols::line::HORIZONTAL
+        // Draw a proper line between the two points
+        self.draw_line_between_points(f, from, to, area);
+    }
+
+    fn draw_line_between_points(
+        &self,
+        f: &mut Frame,
+        from: (u16, u16),
+        to: (u16, u16),
+        area: Rect,
+    ) {
+        let dx = to.0 as i32 - from.0 as i32;
+        let dy = to.1 as i32 - from.1 as i32;
+        
+        // Use Bresenham's line algorithm for proper line drawing
+        let steps = dx.abs().max(dy.abs());
+        
+        if steps == 0 {
+            return;
+        }
+        
+        let x_step = dx as f32 / steps as f32;
+        let y_step = dy as f32 / steps as f32;
+        
+        for i in 0..=steps {
+            let x = (from.0 as f32 + i as f32 * x_step) as u16;
+            let y = (from.1 as f32 + i as f32 * y_step) as u16;
+            
+            if x < area.x + area.width && y < area.y + area.height {
+                let point_area = Rect {
+                    x,
+                    y,
+                    width: 1,
+                    height: 1,
+                };
+                
+                // Choose line character based on direction
+                let line_char = if dx.abs() > dy.abs() {
+                    if dx > 0 { "─" } else { "─" }
+                } else if dy.abs() > dx.abs() {
+                    if dy > 0 { "│" } else { "│" }
+                } else {
+                    // Diagonal
+                    if (dx > 0 && dy > 0) || (dx < 0 && dy < 0) { "╲" } else { "╱" }
+                };
+                
+                let line_widget = Paragraph::new(line_char)
+                    .style(Style::default().fg(Color::Red));
+                
+                if point_area.intersects(area) {
+                    f.render_widget(line_widget, point_area);
+                }
+            }
+        }
+        
+        // Draw arrow heads to show direction (from FK to PK)
+        self.draw_arrow_head(f, to, from, area);
+    }
+    
+    fn draw_arrow_head(
+        &self,
+        f: &mut Frame,
+        tip: (u16, u16),
+        from: (u16, u16),
+        area: Rect,
+    ) {
+        let dx = from.0 as i32 - tip.0 as i32;
+        let dy = from.1 as i32 - tip.1 as i32;
+        
+        // Determine arrow character based on direction
+        let arrow_char = if dx.abs() > dy.abs() {
+            if dx > 0 { "◄" } else { "►" }
         } else {
-            "⋯"
+            if dy > 0 { "▲" } else { "▼" }
         };
-
-        let line = Paragraph::new(line_char)
-            .style(Style::default().fg(Color::DarkGray));
-
-        let line_area = Rect {
-            x: from.0.min(to.0),
-            y: from.1.min(to.1),
-            width: (from.0.max(to.0) - from.0.min(to.0) + 1),
-            height: (from.1.max(to.1) - from.1.min(to.1) + 1),
+        
+        let arrow_area = Rect {
+            x: tip.0,
+            y: tip.1,
+            width: 1,
+            height: 1,
         };
-
-        if line_area.intersects(area) {
-            f.render_widget(line, line_area);
+        
+        let arrow_widget = Paragraph::new(arrow_char)
+            .style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD));
+        
+        if arrow_area.intersects(area) {
+            f.render_widget(arrow_widget, arrow_area);
         }
     }
 
@@ -232,8 +331,10 @@ pub fn render_help_screen(f: &mut Frame, area: Rect) {
         Line::from("  🗝         - Primary key column"),
         Line::from("  🔗         - Foreign key column"),
         Line::from("  ?          - Nullable column"),
+        Line::from("  ─│╲╱►◄▲▼   - Red relationship lines with arrows"),
         Line::from(""),
         Line::from("Selected entities are highlighted in yellow."),
+        Line::from("Relationship lines are drawn in red between connected tables."),
         Line::from("Press any key to return."),
     ];
 

@@ -105,9 +105,10 @@ fn ui(f: &mut ratatui::Frame, app: &App) {
 
     let status_message = if app.schema.entities.len() > 0 {
         format!(
-            "Mode: {} | Entities: {} | Sample E-commerce Schema Loaded | Press '?' for help | Press 'q' to quit",
+            "Mode: {} | Entities: {} | Relationships: {} | Sample E-commerce Schema Loaded | Press '?' for help | Press 'q' to quit",
             mode_text,
-            app.schema.entities.len()
+            app.schema.entities.len(),
+            app.schema.relationships.len()
         )
     } else {
         format!(

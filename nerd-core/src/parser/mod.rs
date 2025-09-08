@@ -1,6 +1,6 @@
-use crate::models::{Column, Entity, Schema, Position, Dimensions};
+use crate::models::{Column, Entity, Schema, Position, Dimensions, Relationship, RelationshipType, ForeignKeyReference};
 use anyhow::Result;
-use sqlparser::ast::{ColumnDef, ColumnOption, DataType, Statement};
+use sqlparser::ast::{ColumnDef, ColumnOption, DataType, Statement, TableConstraint};
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
 use std::collections::HashMap;
@@ -19,13 +19,15 @@ impl SqlParser {
     pub fn parse_sql(&self, sql: &str) -> Result<Schema> {
         let statements = Parser::parse_sql(&self.dialect, sql)?;
         let mut entities = HashMap::new();
+        let mut relationships = Vec::new();
         
         for statement in statements {
             match statement {
                 Statement::CreateTable(create_table) => {
                     let table_name = create_table.name.to_string();
-                    let entity = self.parse_table(&table_name, &create_table.columns)?;
+                    let (entity, table_relationships) = self.parse_table(&table_name, &create_table.columns, &create_table.constraints)?;
                     entities.insert(table_name, entity);
+                    relationships.extend(table_relationships);
                 }
                 _ => continue,
             }
@@ -33,18 +35,22 @@ impl SqlParser {
         
         Ok(Schema {
             entities,
-            relationships: Vec::new(),
+            relationships,
         })
     }
 
-    fn parse_table(&self, table_name: &str, columns: &[ColumnDef]) -> Result<Entity> {
+    fn parse_table(&self, table_name: &str, columns: &[ColumnDef], constraints: &Vec<TableConstraint>) -> Result<(Entity, Vec<Relationship>)> {
         let mut parsed_columns = Vec::new();
+        let mut relationships = Vec::new();
         
+        // Parse columns
         for column_def in columns {
             let column_name = column_def.name.to_string();
             let data_type = self.format_data_type(&column_def.data_type);
             let mut nullable = true;
             let mut is_primary_key = false;
+            let mut is_foreign_key = false;
+            let mut references = None;
             
             for option_def in &column_def.options {
                 match &option_def.option {
@@ -52,6 +58,26 @@ impl SqlParser {
                     ColumnOption::Unique { is_primary, .. } if *is_primary => {
                         is_primary_key = true;
                         nullable = false;
+                    }
+                    ColumnOption::ForeignKey { foreign_table, referred_columns, .. } => {
+                        is_foreign_key = true;
+                        let ref_table = foreign_table.to_string();
+                        let ref_column = referred_columns.first()
+                            .map(|c| c.to_string())
+                            .unwrap_or_else(|| "id".to_string());
+                        
+                        references = Some(ForeignKeyReference {
+                            table: ref_table.clone(),
+                            column: ref_column.clone(),
+                        });
+                        
+                        relationships.push(Relationship {
+                            from_table: table_name.to_string(),
+                            from_column: column_name.clone(),
+                            to_table: ref_table,
+                            to_column: ref_column,
+                            relationship_type: RelationshipType::OneToMany,
+                        });
                     }
                     _ => {}
                 }
@@ -62,17 +88,61 @@ impl SqlParser {
                 data_type,
                 nullable,
                 is_primary_key,
-                is_foreign_key: false,
-                references: None,
+                is_foreign_key,
+                references,
             });
         }
         
-        Ok(Entity {
+        // Parse table-level foreign key constraints
+        for constraint in constraints {
+            match constraint {
+                TableConstraint::ForeignKey { columns: fk_columns, foreign_table, referred_columns, .. } => {
+                    for fk_col in fk_columns {
+                        let fk_col_name = fk_col.to_string();
+                        let ref_table = foreign_table.to_string();
+                        let ref_column = referred_columns.first()
+                            .map(|c| c.to_string())
+                            .unwrap_or_else(|| "id".to_string());
+                        
+                        // Mark the column as foreign key
+                        if let Some(column) = parsed_columns.iter_mut().find(|c| c.name == fk_col_name) {
+                            column.is_foreign_key = true;
+                            column.references = Some(ForeignKeyReference {
+                                table: ref_table.clone(),
+                                column: ref_column.clone(),
+                            });
+                        }
+                        
+                        relationships.push(Relationship {
+                            from_table: table_name.to_string(),
+                            from_column: fk_col_name,
+                            to_table: ref_table,
+                            to_column: ref_column,
+                            relationship_type: RelationshipType::OneToMany,
+                        });
+                    }
+                }
+                TableConstraint::PrimaryKey { columns: pk_columns, .. } => {
+                    for pk_col in pk_columns {
+                        let pk_col_name = pk_col.to_string();
+                        if let Some(column) = parsed_columns.iter_mut().find(|c| c.name == pk_col_name) {
+                            column.is_primary_key = true;
+                            column.nullable = false;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        
+        let entity = Entity {
             name: table_name.to_string(),
             columns: parsed_columns,
             position: Position::default(),
             dimensions: Dimensions { width: 20, height: 10 },
-        })
+        };
+        
+        Ok((entity, relationships))
     }
 
     fn format_data_type(&self, data_type: &DataType) -> String {
@@ -144,7 +214,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_multiple_tables() {
+    fn test_parse_tables_with_foreign_keys() {
         let sql = "
             CREATE TABLE departments (
                 id INT PRIMARY KEY,
@@ -154,7 +224,8 @@ mod tests {
             CREATE TABLE employees (
                 id INT PRIMARY KEY,
                 name VARCHAR(100) NOT NULL,
-                dept_id INT
+                dept_id INT,
+                FOREIGN KEY (dept_id) REFERENCES departments(id)
             );
         ";
         
@@ -165,10 +236,22 @@ mod tests {
         assert!(schema.entities.contains_key("departments"));
         assert!(schema.entities.contains_key("employees"));
         
-        let departments = &schema.entities["departments"];
-        assert_eq!(departments.columns.len(), 2);
+        // Check relationships were created
+        assert_eq!(schema.relationships.len(), 1);
+        let rel = &schema.relationships[0];
+        assert_eq!(rel.from_table, "employees");
+        assert_eq!(rel.from_column, "dept_id");
+        assert_eq!(rel.to_table, "departments");
+        assert_eq!(rel.to_column, "id");
         
+        // Check foreign key column is marked correctly
         let employees = &schema.entities["employees"];
-        assert_eq!(employees.columns.len(), 3);
+        let dept_id_col = employees.columns.iter().find(|c| c.name == "dept_id").unwrap();
+        assert!(dept_id_col.is_foreign_key);
+        assert!(dept_id_col.references.is_some());
+        
+        let fk_ref = dept_id_col.references.as_ref().unwrap();
+        assert_eq!(fk_ref.table, "departments");
+        assert_eq!(fk_ref.column, "id");
     }
 }

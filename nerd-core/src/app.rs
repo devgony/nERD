@@ -363,8 +363,9 @@ CREATE TABLE order_items (
         if let Ok(has_changes) = self.schema_sync.merge_sql_changes(&mut self.schema, &self.sql_content) {
             if has_changes {
                 self.layout_engine.layout_entities(&mut self.schema);
-                self.mode = AppMode::DiagramView;
             }
+            // Always switch back to DiagramView after sync attempt
+            self.mode = AppMode::DiagramView;
         }
     }
 

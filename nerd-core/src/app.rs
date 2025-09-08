@@ -3,7 +3,6 @@ use crate::parser::SqlParser;
 use crate::layout::LayoutEngine;
 use crate::sync::SchemaSync;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use anyhow::Result;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum AppMode {

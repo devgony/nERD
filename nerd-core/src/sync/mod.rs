@@ -1,4 +1,4 @@
-use crate::models::{Schema, Entity, Column, Relationship, RelationshipType};
+use crate::models::{Schema, Entity, Column, Relationship};
 use anyhow::Result;
 
 pub struct SchemaSync {
@@ -14,7 +14,7 @@ impl SchemaSync {
         let mut sql_statements = Vec::new();
 
         // Generate CREATE TABLE statements
-        for (table_name, entity) in &schema.entities {
+        for (_table_name, entity) in &schema.entities {
             let table_sql = self.generate_create_table(entity);
             sql_statements.push(table_sql);
         }
@@ -266,7 +266,7 @@ mod tests {
     #[test]
     fn test_detect_schema_changes() {
         let sync = SchemaSync::new();
-        let mut schema1 = Schema::new();
+        let schema1 = Schema::new();
         let mut schema2 = Schema::new();
 
         // Identical schemas should show no changes

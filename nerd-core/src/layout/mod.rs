@@ -108,7 +108,8 @@ impl LayoutEngine {
         positions: &HashMap<String, Position>,
         forces: &mut HashMap<String, (f64, f64)>,
     ) {
-        let repulsion_strength = 5000.0;
+        // Increased repulsion strength for broader margins
+        let repulsion_strength = 15000.0;
         
         for (entity1, pos1) in positions {
             for (entity2, pos2) in positions {
@@ -139,7 +140,8 @@ impl LayoutEngine {
         relationships: &[Relationship],
     ) {
         let attraction_strength = 100.0;
-        let ideal_distance = 150.0;
+        // Increased ideal distance for more spacing
+        let ideal_distance = 250.0;
         
         for relationship in relationships {
             if let (Some(pos1), Some(pos2)) = (

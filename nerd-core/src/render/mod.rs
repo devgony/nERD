@@ -404,54 +404,63 @@ impl DiagramRenderer {
         let dx = to.0 as i32 - from.0 as i32;
         let dy = to.1 as i32 - from.1 as i32;
         
-        // Choose routing style based on the connection pattern
-        if dx.abs() > dy.abs() {
-            // Horizontal-dominant: go horizontal first, then vertical, then horizontal
-            let mid_x = from.0 as i32 + dx / 2;
-            let mid1 = (mid_x as u16, from.1);
-            let mid2 = (mid_x as u16, to.1);
-            
-            // Only draw segments if they have meaningful length
-            if from.0 != mid1.0 {
-                self.draw_horizontal_line_avoiding_entities(f, from, mid1, entity_areas, area);
-            }
-            if mid1.1 != mid2.1 {
-                self.draw_vertical_line_avoiding_entities(f, mid1, mid2, entity_areas, area);
-            }
-            if mid2.0 != to.0 {
-                self.draw_horizontal_line_avoiding_entities(f, mid2, to, entity_areas, area);
-            }
-            
-            // Draw corners only where segments actually meet and change direction
-            if from.0 != mid1.0 && mid1.1 != mid2.1 && !self.point_intersects_any_entity(mid1.0, mid1.1, entity_areas) {
-                self.draw_corner(f, mid1, from, mid2, area);
-            }
-            if mid1.1 != mid2.1 && mid2.0 != to.0 && !self.point_intersects_any_entity(mid2.0, mid2.1, entity_areas) {
-                self.draw_corner(f, mid2, mid1, to, area);
-            }
+        // Find a path that avoids entities by routing around them
+        // Check if direct path intersects any entity
+        let needs_rerouting = self.line_intersects_entities(from, to, entity_areas);
+        
+        if needs_rerouting {
+            // Try to route around entities with a wider path
+            self.draw_routed_line_around_entities(f, from, to, entity_areas, area);
         } else {
-            // Vertical-dominant: go vertical first, then horizontal, then vertical
-            let mid_y = from.1 as i32 + dy / 2;
-            let mid1 = (from.0, mid_y as u16);
-            let mid2 = (to.0, mid_y as u16);
-            
-            // Only draw segments if they have meaningful length
-            if from.1 != mid1.1 {
-                self.draw_vertical_line_avoiding_entities(f, from, mid1, entity_areas, area);
-            }
-            if mid1.0 != mid2.0 {
-                self.draw_horizontal_line_avoiding_entities(f, mid1, mid2, entity_areas, area);
-            }
-            if mid2.1 != to.1 {
-                self.draw_vertical_line_avoiding_entities(f, mid2, to, entity_areas, area);
-            }
-            
-            // Draw corners only where segments actually meet and change direction
-            if from.1 != mid1.1 && mid1.0 != mid2.0 && !self.point_intersects_any_entity(mid1.0, mid1.1, entity_areas) {
-                self.draw_corner(f, mid1, from, mid2, area);
-            }
-            if mid1.0 != mid2.0 && mid2.1 != to.1 && !self.point_intersects_any_entity(mid2.0, mid2.1, entity_areas) {
-                self.draw_corner(f, mid2, mid1, to, area);
+            // Use standard 3-segment routing
+            if dx.abs() > dy.abs() {
+                // Horizontal-dominant: go horizontal first, then vertical, then horizontal
+                let mid_x = from.0 as i32 + dx / 2;
+                let mid1 = (mid_x as u16, from.1);
+                let mid2 = (mid_x as u16, to.1);
+                
+                // Only draw segments if they have meaningful length
+                if from.0 != mid1.0 {
+                    self.draw_horizontal_line_avoiding_entities(f, from, mid1, entity_areas, area);
+                }
+                if mid1.1 != mid2.1 {
+                    self.draw_vertical_line_avoiding_entities(f, mid1, mid2, entity_areas, area);
+                }
+                if mid2.0 != to.0 {
+                    self.draw_horizontal_line_avoiding_entities(f, mid2, to, entity_areas, area);
+                }
+                
+                // Draw corners only where segments actually meet and change direction
+                if from.0 != mid1.0 && mid1.1 != mid2.1 && !self.point_intersects_any_entity(mid1.0, mid1.1, entity_areas) {
+                    self.draw_corner(f, mid1, from, mid2, area);
+                }
+                if mid1.1 != mid2.1 && mid2.0 != to.0 && !self.point_intersects_any_entity(mid2.0, mid2.1, entity_areas) {
+                    self.draw_corner(f, mid2, mid1, to, area);
+                }
+            } else {
+                // Vertical-dominant: go vertical first, then horizontal, then vertical
+                let mid_y = from.1 as i32 + dy / 2;
+                let mid1 = (from.0, mid_y as u16);
+                let mid2 = (to.0, mid_y as u16);
+                
+                // Only draw segments if they have meaningful length
+                if from.1 != mid1.1 {
+                    self.draw_vertical_line_avoiding_entities(f, from, mid1, entity_areas, area);
+                }
+                if mid1.0 != mid2.0 {
+                    self.draw_horizontal_line_avoiding_entities(f, mid1, mid2, entity_areas, area);
+                }
+                if mid2.1 != to.1 {
+                    self.draw_vertical_line_avoiding_entities(f, mid2, to, entity_areas, area);
+                }
+                
+                // Draw corners only where segments actually meet and change direction
+                if from.1 != mid1.1 && mid1.0 != mid2.0 && !self.point_intersects_any_entity(mid1.0, mid1.1, entity_areas) {
+                    self.draw_corner(f, mid1, from, mid2, area);
+                }
+                if mid1.0 != mid2.0 && mid2.1 != to.1 && !self.point_intersects_any_entity(mid2.0, mid2.1, entity_areas) {
+                    self.draw_corner(f, mid2, mid1, to, area);
+                }
             }
         }
     }
@@ -496,6 +505,115 @@ impl DiagramRenderer {
         x <= entity_area.x + entity_area.width - 1 &&
         y >= entity_area.y && 
         y <= entity_area.y + entity_area.height - 1
+    }
+    
+    fn line_intersects_entities(&self, from: (u16, u16), to: (u16, u16), entity_areas: &[Rect]) -> bool {
+        // Check if the line from 'from' to 'to' intersects any entity
+        let dx = to.0 as i32 - from.0 as i32;
+        let dy = to.1 as i32 - from.1 as i32;
+        let steps = dx.abs().max(dy.abs());
+        
+        if steps == 0 {
+            return false;
+        }
+        
+        for i in 0..=steps {
+            let t = i as f32 / steps as f32;
+            let x = (from.0 as f32 + t * dx as f32) as u16;
+            let y = (from.1 as f32 + t * dy as f32) as u16;
+            
+            if self.point_intersects_any_entity(x, y, entity_areas) {
+                return true;
+            }
+        }
+        
+        false
+    }
+    
+    fn draw_routed_line_around_entities(
+        &self,
+        f: &mut Frame,
+        from: (u16, u16),
+        to: (u16, u16),
+        entity_areas: &[Rect],
+        area: Rect,
+    ) {
+        // Route around entities by going wider
+        let dx = to.0 as i32 - from.0 as i32;
+        let dy = to.1 as i32 - from.1 as i32;
+        
+        // Find a clear path by adding extra offset to avoid entities
+        let offset = 5; // Extra spacing to route around entities
+        
+        if dx.abs() > dy.abs() {
+            // Try routing above or below entities
+            let try_above = from.1.saturating_sub(offset);
+            let try_below = from.1.saturating_add(offset).min(area.height - 1);
+            
+            // Check which path is clearer
+            let above_clear = !self.line_intersects_entities((from.0, try_above), (to.0, try_above), entity_areas);
+            let below_clear = !self.line_intersects_entities((from.0, try_below), (to.0, try_below), entity_areas);
+            
+            let route_y = if above_clear && !below_clear {
+                try_above
+            } else if below_clear && !above_clear {
+                try_below
+            } else if dy < 0 {
+                try_above // Going up, route above
+            } else {
+                try_below // Going down, route below
+            };
+            
+            // Draw the routed path
+            let mid1 = (from.0, route_y);
+            let mid2 = (to.0, route_y);
+            
+            self.draw_vertical_line_avoiding_entities(f, from, mid1, entity_areas, area);
+            self.draw_horizontal_line_avoiding_entities(f, mid1, mid2, entity_areas, area);
+            self.draw_vertical_line_avoiding_entities(f, mid2, to, entity_areas, area);
+            
+            // Draw corners
+            if !self.point_intersects_any_entity(mid1.0, mid1.1, entity_areas) {
+                self.draw_corner(f, mid1, from, mid2, area);
+            }
+            if !self.point_intersects_any_entity(mid2.0, mid2.1, entity_areas) {
+                self.draw_corner(f, mid2, mid1, to, area);
+            }
+        } else {
+            // Try routing left or right of entities
+            let try_left = from.0.saturating_sub(offset);
+            let try_right = from.0.saturating_add(offset).min(area.width - 1);
+            
+            // Check which path is clearer
+            let left_clear = !self.line_intersects_entities((try_left, from.1), (try_left, to.1), entity_areas);
+            let right_clear = !self.line_intersects_entities((try_right, from.1), (try_right, to.1), entity_areas);
+            
+            let route_x = if left_clear && !right_clear {
+                try_left
+            } else if right_clear && !left_clear {
+                try_right
+            } else if dx < 0 {
+                try_left // Going left, route left
+            } else {
+                try_right // Going right, route right
+            };
+            
+            // Draw the routed path
+            let mid1 = (route_x, from.1);
+            let mid2 = (route_x, to.1);
+            
+            self.draw_horizontal_line_avoiding_entities(f, from, mid1, entity_areas, area);
+            self.draw_vertical_line_avoiding_entities(f, mid1, mid2, entity_areas, area);
+            self.draw_horizontal_line_avoiding_entities(f, mid2, to, entity_areas, area);
+            
+            // Draw corners
+            if !self.point_intersects_any_entity(mid1.0, mid1.1, entity_areas) {
+                self.draw_corner(f, mid1, from, mid2, area);
+            }
+            if !self.point_intersects_any_entity(mid2.0, mid2.1, entity_areas) {
+                self.draw_corner(f, mid2, mid1, to, area);
+            }
+        }
     }
     
     fn draw_arrow_head(

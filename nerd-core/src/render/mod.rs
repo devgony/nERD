@@ -1,4 +1,4 @@
-use crate::models::{Entity, Schema};
+use crate::models::{Entity, Schema, Relationship};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -130,7 +130,7 @@ impl DiagramRenderer {
                 schema.entities.get(&relationship.from_table),
                 schema.entities.get(&relationship.to_table),
             ) {
-                self.render_relationship_line(f, from_entity, to_entity, area);
+                self.render_relationship_line(f, from_entity, to_entity, relationship, area);
             }
         }
     }
@@ -140,30 +140,51 @@ impl DiagramRenderer {
         f: &mut Frame,
         from_entity: &Entity,
         to_entity: &Entity,
+        relationship: &Relationship,
         area: Rect,
     ) {
         let from_area = self.calculate_entity_area(from_entity, area);
         let to_area = self.calculate_entity_area(to_entity, area);
 
-        // Calculate connection points on entity edges instead of centers
-        let (from_point, to_point) = self.calculate_connection_points(&from_area, &to_area);
+        // Calculate connection points for specific columns
+        let (from_point, to_point) = self.calculate_column_connection_points(
+            from_entity, 
+            to_entity, 
+            &relationship.from_column,
+            &relationship.to_column,
+            &from_area, 
+            &to_area
+        );
 
         self.draw_connection_line(f, from_point, to_point, area);
     }
 
-    fn calculate_connection_points(&self, from_area: &Rect, to_area: &Rect) -> ((u16, u16), (u16, u16)) {
+
+    fn calculate_column_connection_points(
+        &self,
+        from_entity: &Entity,
+        to_entity: &Entity,
+        from_column_name: &str,
+        to_column_name: &str,
+        from_area: &Rect,
+        to_area: &Rect,
+    ) -> ((u16, u16), (u16, u16)) {
+        // Calculate the Y position of the specific columns within their entities
+        let from_column_y = self.calculate_column_y_position(from_entity, from_column_name, from_area);
+        let to_column_y = self.calculate_column_y_position(to_entity, to_column_name, to_area);
+
+        // Determine which edges to connect based on entity positions
         let from_center_x = from_area.x + from_area.width / 2;
         let from_center_y = from_area.y + from_area.height / 2;
         let to_center_x = to_area.x + to_area.width / 2;
         let to_center_y = to_area.y + to_area.height / 2;
 
-        // Determine which edges to connect based on relative positions
         let from_point = if to_center_x > from_center_x {
-            // Connect from right edge
-            (from_area.x + from_area.width - 1, from_center_y)
+            // Connect from right edge at column height
+            (from_area.x + from_area.width - 1, from_column_y)
         } else if to_center_x < from_center_x {
-            // Connect from left edge
-            (from_area.x, from_center_y)
+            // Connect from left edge at column height
+            (from_area.x, from_column_y)
         } else if to_center_y > from_center_y {
             // Connect from bottom edge
             (from_center_x, from_area.y + from_area.height - 1)
@@ -173,11 +194,11 @@ impl DiagramRenderer {
         };
 
         let to_point = if from_center_x > to_center_x {
-            // Connect to right edge
-            (to_area.x + to_area.width - 1, to_center_y)
+            // Connect to right edge at column height
+            (to_area.x + to_area.width - 1, to_column_y)
         } else if from_center_x < to_center_x {
-            // Connect to left edge
-            (to_area.x, to_center_y)
+            // Connect to left edge at column height
+            (to_area.x, to_column_y)
         } else if from_center_y > to_center_y {
             // Connect to bottom edge
             (to_center_x, to_area.y + to_area.height - 1)
@@ -187,6 +208,21 @@ impl DiagramRenderer {
         };
 
         (from_point, to_point)
+    }
+
+    fn calculate_column_y_position(&self, entity: &Entity, column_name: &str, entity_area: &Rect) -> u16 {
+        // The inner area starts 1 pixel down from the entity area (for the border)
+        let inner_y = entity_area.y + 1;
+        
+        // Find the column index
+        let column_index = entity.columns
+            .iter()
+            .position(|col| col.name == column_name)
+            .unwrap_or(0);
+        
+        // Each column takes up 1 line in the list
+        // Add the column index to the inner Y position
+        inner_y + column_index as u16
     }
 
     fn draw_connection_line(
@@ -334,7 +370,7 @@ pub fn render_help_screen(f: &mut Frame, area: Rect) {
         Line::from("  ─│╲╱►◄▲▼   - Red relationship lines with arrows"),
         Line::from(""),
         Line::from("Selected entities are highlighted in yellow."),
-        Line::from("Relationship lines are drawn in red between connected tables."),
+        Line::from("Red relationship lines connect exact columns (FK → PK)."),
         Line::from("Press any key to return."),
     ];
 
@@ -472,5 +508,67 @@ mod tests {
         assert_eq!(centered.height, 30);
         assert_eq!(centered.x, 25);
         assert_eq!(centered.y, 10);
+    }
+
+    #[test]
+    fn test_calculate_column_y_position() {
+        use crate::models::Column;
+        
+        let renderer = DiagramRenderer::new(800, 600);
+        
+        let entity = Entity {
+            name: "test_table".to_string(),
+            columns: vec![
+                Column {
+                    name: "id".to_string(),
+                    data_type: "INT".to_string(),
+                    nullable: false,
+                    is_primary_key: true,
+                    is_foreign_key: false,
+                    references: None,
+                },
+                Column {
+                    name: "user_id".to_string(),
+                    data_type: "INT".to_string(),
+                    nullable: false,
+                    is_primary_key: false,
+                    is_foreign_key: true,
+                    references: None,
+                },
+                Column {
+                    name: "name".to_string(),
+                    data_type: "VARCHAR(100)".to_string(),
+                    nullable: false,
+                    is_primary_key: false,
+                    is_foreign_key: false,
+                    references: None,
+                },
+            ],
+            position: Position { x: 100.0, y: 100.0 },
+            dimensions: Dimensions { width: 30, height: 10 },
+        };
+
+        let entity_area = Rect {
+            x: 10,
+            y: 10,
+            width: 30,
+            height: 10,
+        };
+
+        // Test first column (id) - should be at y=11 (10 + 1 for border + 0 for index)
+        let id_y = renderer.calculate_column_y_position(&entity, "id", &entity_area);
+        assert_eq!(id_y, 11);
+
+        // Test second column (user_id) - should be at y=12 (10 + 1 for border + 1 for index)
+        let user_id_y = renderer.calculate_column_y_position(&entity, "user_id", &entity_area);
+        assert_eq!(user_id_y, 12);
+
+        // Test third column (name) - should be at y=13 (10 + 1 for border + 2 for index)
+        let name_y = renderer.calculate_column_y_position(&entity, "name", &entity_area);
+        assert_eq!(name_y, 13);
+
+        // Test non-existent column - should default to first column position
+        let unknown_y = renderer.calculate_column_y_position(&entity, "unknown", &entity_area);
+        assert_eq!(unknown_y, 11);
     }
 }

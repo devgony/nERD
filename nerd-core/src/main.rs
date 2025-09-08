@@ -98,7 +98,12 @@ fn ui(f: &mut ratatui::Frame, app: &App) {
 
     let mode_text = match app.mode {
         app::AppMode::DiagramView => "Diagram",
-        app::AppMode::SqlEditor => "SQL Editor", 
+        app::AppMode::SqlEditor => {
+            match app.vim_mode {
+                app::VimMode::Normal => "SQL Editor (NORMAL)",
+                app::VimMode::Insert => "SQL Editor (INSERT)",
+            }
+        }, 
         app::AppMode::Help => "Help",
         app::AppMode::EntityCreator => "New Entity",
     };

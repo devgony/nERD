@@ -108,7 +108,12 @@ CREATE TABLE order_items (
     fn handle_diagram_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Char('q') => self.should_quit = true,
-            KeyCode::Char('s') => self.mode = AppMode::SqlEditor,
+            KeyCode::Char('s') => {
+                self.mode = AppMode::SqlEditor;
+                self.vim_mode = VimMode::Normal;
+                // Keep cursor at current position or end of content if beyond
+                self.cursor_position = self.cursor_position.min(self.sql_content.len());
+            }
             KeyCode::Char('?') => self.mode = AppMode::Help,
             KeyCode::Char('n') => self.mode = AppMode::EntityCreator,
             KeyCode::Char('i') => self.import_sql(),
@@ -340,6 +345,8 @@ CREATE TABLE order_items (
             self.parse_and_apply_sql();
         } else {
             self.mode = AppMode::SqlEditor;
+            self.vim_mode = VimMode::Normal;
+            self.cursor_position = self.sql_content.len();
         }
     }
 
@@ -365,6 +372,8 @@ CREATE TABLE order_items (
         self.sql_content = self.schema_sync.generate_sql(&self.schema);
         self.last_generated_sql = self.sql_content.clone();
         self.mode = AppMode::SqlEditor;
+        self.vim_mode = VimMode::Normal;
+        self.cursor_position = 0; // Start at beginning of generated content
     }
 
     fn validate_schema(&mut self) {
@@ -579,5 +588,63 @@ CREATE TABLE order_items (
         }
         
         pos
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_vim_mode_initialization() {
+        let app = App::new();
+        assert_eq!(app.vim_mode, VimMode::Normal);
+        assert_eq!(app.cursor_position, 0);
+    }
+
+    #[test]
+    fn test_cursor_movement_basic() {
+        let mut app = App::new();
+        app.sql_content = "Hello\nWorld".to_string();
+        app.cursor_position = 0;
+        
+        // Test basic movement
+        let (line, col) = app.get_line_and_column();
+        assert_eq!(line, 0);
+        assert_eq!(col, 0);
+        
+        // Move to position 3 (middle of "Hello")
+        app.cursor_position = 3;
+        let (line, col) = app.get_line_and_column();
+        assert_eq!(line, 0);
+        assert_eq!(col, 3);
+        
+        // Move to second line
+        app.cursor_position = 6; // After newline
+        let (line, col) = app.get_line_and_column();
+        assert_eq!(line, 1);
+        assert_eq!(col, 0);
+    }
+
+    #[test]
+    fn test_insert_char_at_cursor() {
+        let mut app = App::new();
+        app.sql_content = "Hello".to_string();
+        app.cursor_position = 2;
+        
+        app.insert_char_at_cursor('X');
+        assert_eq!(app.sql_content, "HeXllo");
+        assert_eq!(app.cursor_position, 3); // Cursor moved after inserted char
+    }
+
+    #[test]
+    fn test_delete_char_at_cursor() {
+        let mut app = App::new();
+        app.sql_content = "Hello".to_string();
+        app.cursor_position = 2;
+        
+        app.delete_char_at_cursor();
+        assert_eq!(app.sql_content, "Helo");
+        assert_eq!(app.cursor_position, 2); // Cursor stays at same position
     }
 }

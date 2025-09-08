@@ -615,6 +615,7 @@ pub fn render_help_screen(f: &mut Frame, area: Rect) {
 
 pub fn render_sql_editor_with_vim(f: &mut Frame, content: &str, vim_mode: crate::app::VimMode, cursor_position: usize, area: Rect) {
     use crate::app::VimMode;
+    use ratatui::layout::Constraint;
     
     let vim_mode_text = match vim_mode {
         VimMode::Normal => "-- NORMAL --",
@@ -623,20 +624,24 @@ pub fn render_sql_editor_with_vim(f: &mut Frame, content: &str, vim_mode: crate:
     
     let (line, col) = get_line_column_from_position(content, cursor_position);
     
-    let instructions = if content.is_empty() {
-        format!("Enter SQL CREATE TABLE statements here.\nPress 'i' to enter INSERT mode, ESC for NORMAL mode.\nPress Ctrl+S to parse and apply.\nPress Esc in NORMAL mode to return to diagram view.\n\n{} | Line: {} Col: {}", vim_mode_text, line + 1, col + 1)
-    } else {
-        format!("{} | Line: {} Col: {}", vim_mode_text, line + 1, col + 1)
-    };
+    // Split the area into content and status line
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(1),      // Content area
+            Constraint::Length(1),   // Status line
+        ])
+        .split(area);
     
-    let display_content = if content.is_empty() {
-        &instructions
+    // Create content with visible cursor
+    let content_with_cursor = if content.is_empty() {
+        format!("Enter SQL CREATE TABLE statements here.\nPress 'i' to enter INSERT mode, ESC for NORMAL mode.\nPress Ctrl+S to parse and apply.\nPress Esc in NORMAL mode to return to diagram view.\n\n█") // Block cursor for empty
     } else {
-        // Show content with cursor position indicator
-        content
+        insert_cursor_in_content(content, cursor_position, vim_mode)
     };
 
-    let sql_text = Paragraph::new(display_content)
+    // Main content area
+    let content_widget = Paragraph::new(content_with_cursor.as_str())
         .block(
             Block::default()
                 .title("SQL Editor (VIM Mode)")
@@ -644,13 +649,47 @@ pub fn render_sql_editor_with_vim(f: &mut Frame, content: &str, vim_mode: crate:
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::Green)),
         )
-        .style(if content.is_empty() { 
-            Style::default().fg(Color::DarkGray) 
-        } else { 
-            Style::default().fg(Color::White) 
-        });
+        .style(Style::default().fg(Color::White))
+        .wrap(ratatui::widgets::Wrap { trim: false });
 
-    f.render_widget(sql_text, area);
+    f.render_widget(content_widget, chunks[0]);
+
+    // Status line at bottom
+    let status_text = format!("{} | Line: {} Col: {} | Cursor: {}", 
+                             vim_mode_text, line + 1, col + 1, cursor_position);
+    let status_widget = Paragraph::new(status_text)
+        .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+        .block(Block::default().borders(Borders::TOP));
+
+    f.render_widget(status_widget, chunks[1]);
+}
+
+fn insert_cursor_in_content(content: &str, cursor_position: usize, vim_mode: crate::app::VimMode) -> String {
+    use crate::app::VimMode;
+    
+    let cursor_char = match vim_mode {
+        VimMode::Normal => "█",  // Block cursor for normal mode
+        VimMode::Insert => "|",  // Line cursor for insert mode
+    };
+    
+    if cursor_position >= content.len() {
+        // Cursor at end of content
+        format!("{}{}", content, cursor_char)
+    } else {
+        // Insert cursor at position
+        let mut result = String::new();
+        let mut current_pos = 0;
+        
+        for ch in content.chars() {
+            if current_pos == cursor_position {
+                result.push_str(cursor_char);
+            }
+            result.push(ch);
+            current_pos += ch.len_utf8();
+        }
+        
+        result
+    }
 }
 
 fn get_line_column_from_position(content: &str, position: usize) -> (usize, usize) {
@@ -827,6 +866,49 @@ mod tests {
         // Test non-existent column - should default to first column position
         let unknown_y = renderer.calculate_column_y_position(&entity, "unknown", &entity_area);
         assert_eq!(unknown_y, 11);
+    }
+
+    #[test]
+    fn test_insert_cursor_in_content() {
+        use crate::app::VimMode;
+        
+        // Test normal mode cursor (block)
+        let content = "Hello World";
+        let result = insert_cursor_in_content(content, 5, VimMode::Normal);
+        assert_eq!(result, "Hello█ World");
+        
+        // Test insert mode cursor (line)
+        let result = insert_cursor_in_content(content, 5, VimMode::Insert);
+        assert_eq!(result, "Hello| World");
+        
+        // Test cursor at end
+        let result = insert_cursor_in_content(content, 11, VimMode::Normal);
+        assert_eq!(result, "Hello World█");
+        
+        // Test empty content
+        let result = insert_cursor_in_content("", 0, VimMode::Normal);
+        assert_eq!(result, "█");
+    }
+
+    #[test]
+    fn test_get_line_column_from_position() {
+        let content = "Hello\nWorld\nTest";
+        
+        // Position 0 (start)
+        let (line, col) = get_line_column_from_position(content, 0);
+        assert_eq!((line, col), (0, 0));
+        
+        // Position 3 (middle of first line)
+        let (line, col) = get_line_column_from_position(content, 3);
+        assert_eq!((line, col), (0, 3));
+        
+        // Position 6 (start of second line)
+        let (line, col) = get_line_column_from_position(content, 6);
+        assert_eq!((line, col), (1, 0));
+        
+        // Position 12 (start of third line)  
+        let (line, col) = get_line_column_from_position(content, 12);
+        assert_eq!((line, col), (2, 0));
     }
 
     #[test] 

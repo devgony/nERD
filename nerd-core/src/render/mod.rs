@@ -543,26 +543,42 @@ impl DiagramRenderer {
         let dy = to.1 as i32 - from.1 as i32;
         
         // Find a clear path by adding extra offset to avoid entities
-        let offset = 5; // Extra spacing to route around entities
+        let offset = 12; // Increased spacing to route around entities and ensure visibility
         
         if dx.abs() > dy.abs() {
             // Try routing above or below entities
-            let try_above = from.1.saturating_sub(offset);
-            let try_below = from.1.saturating_add(offset).min(area.height - 1);
+            // Find the bounds of entities that might be in the way
+            let blocking_entities: Vec<&Rect> = entity_areas.iter()
+                .filter(|entity| {
+                    // Check if entity is roughly in the path
+                    let entity_left = entity.x as i32;
+                    let entity_right = (entity.x + entity.width) as i32;
+                    let path_left = from.0.min(to.0) as i32;
+                    let path_right = from.0.max(to.0) as i32;
+                    
+                    !(entity_right < path_left || entity_left > path_right)
+                })
+                .collect();
             
-            // Check which path is clearer
-            let above_clear = !self.line_intersects_entities((from.0, try_above), (to.0, try_above), entity_areas);
-            let below_clear = !self.line_intersects_entities((from.0, try_below), (to.0, try_below), entity_areas);
-            
-            let route_y = if above_clear && !below_clear {
-                try_above
-            } else if below_clear && !above_clear {
-                try_below
-            } else if dy < 0 {
-                try_above // Going up, route above
+            let route_y = if !blocking_entities.is_empty() {
+                // Find the topmost and bottommost entity bounds
+                let min_entity_y = blocking_entities.iter().map(|e| e.y).min().unwrap_or(0);
+                let max_entity_bottom = blocking_entities.iter().map(|e| e.y + e.height).max().unwrap_or(0);
+                
+                // Route above all entities if going up, or below all entities if going down
+                if dy < 0 || from.1 < min_entity_y {
+                    min_entity_y.saturating_sub(offset) // Route above
+                } else {
+                    max_entity_bottom + offset // Route below
+                }
             } else {
-                try_below // Going down, route below
-            };
+                // No blocking entities, route normally
+                if dy < 0 {
+                    from.1.saturating_sub(offset)
+                } else {
+                    from.1 + offset
+                }
+            }.min(area.height.saturating_sub(1));
             
             // Draw the routed path
             let mid1 = (from.0, route_y);
@@ -581,22 +597,38 @@ impl DiagramRenderer {
             }
         } else {
             // Try routing left or right of entities
-            let try_left = from.0.saturating_sub(offset);
-            let try_right = from.0.saturating_add(offset).min(area.width - 1);
+            // Find the bounds of entities that might be in the way
+            let blocking_entities: Vec<&Rect> = entity_areas.iter()
+                .filter(|entity| {
+                    // Check if entity is roughly in the path
+                    let entity_top = entity.y as i32;
+                    let entity_bottom = (entity.y + entity.height) as i32;
+                    let path_top = from.1.min(to.1) as i32;
+                    let path_bottom = from.1.max(to.1) as i32;
+                    
+                    !(entity_bottom < path_top || entity_top > path_bottom)
+                })
+                .collect();
             
-            // Check which path is clearer
-            let left_clear = !self.line_intersects_entities((try_left, from.1), (try_left, to.1), entity_areas);
-            let right_clear = !self.line_intersects_entities((try_right, from.1), (try_right, to.1), entity_areas);
-            
-            let route_x = if left_clear && !right_clear {
-                try_left
-            } else if right_clear && !left_clear {
-                try_right
-            } else if dx < 0 {
-                try_left // Going left, route left
+            let route_x = if !blocking_entities.is_empty() {
+                // Find the leftmost and rightmost entity bounds
+                let min_entity_x = blocking_entities.iter().map(|e| e.x).min().unwrap_or(0);
+                let max_entity_right = blocking_entities.iter().map(|e| e.x + e.width).max().unwrap_or(0);
+                
+                // Route left of all entities if going left, or right of all entities if going right
+                if dx < 0 || from.0 < min_entity_x {
+                    min_entity_x.saturating_sub(offset) // Route left
+                } else {
+                    max_entity_right + offset // Route right
+                }
             } else {
-                try_right // Going right, route right
-            };
+                // No blocking entities, route normally
+                if dx < 0 {
+                    from.0.saturating_sub(offset)
+                } else {
+                    from.0 + offset
+                }
+            }.min(area.width.saturating_sub(1));
             
             // Draw the routed path
             let mid1 = (route_x, from.1);

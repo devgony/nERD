@@ -184,26 +184,26 @@ fn test_render_complex_schema_with_relationships() {
     let parser = SqlParser::new();
     let mut schema = parser.parse_sql(sql).expect("Failed to parse SQL");
     
-    // Position entities in a specific layout
+    // Position entities with better spacing to test line routing
     if let Some(users) = schema.entities.get_mut("users") {
-        users.position.x = 10.0;
-        users.position.y = 5.0;
+        users.position.x = 5.0;
+        users.position.y = 2.0;
     }
     if let Some(categories) = schema.entities.get_mut("categories") {
-        categories.position.x = 60.0;
-        categories.position.y = 5.0;
+        categories.position.x = 70.0;
+        categories.position.y = 2.0;
     }
     if let Some(products) = schema.entities.get_mut("products") {
-        products.position.x = 60.0;
+        products.position.x = 70.0;
         products.position.y = 15.0;
     }
     if let Some(orders) = schema.entities.get_mut("orders") {
-        orders.position.x = 10.0;
+        orders.position.x = 5.0;
         orders.position.y = 15.0;
     }
     if let Some(order_items) = schema.entities.get_mut("order_items") {
         order_items.position.x = 35.0;
-        order_items.position.y = 25.0;
+        order_items.position.y = 30.0;
     }
     
     // Create a test terminal

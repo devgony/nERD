@@ -1,0 +1,34 @@
+---
+source: tests/render_output_tests.rs
+expression: output
+---
+          ┌users─────────────┐                              ┌categories────────┐
+          │🗝 id INT          │                              │🗝 id INT          │
+          │  name VARCHAR(100│                              │  name VARCHAR(100│
+          │  email VARCHAR(25│                              │                  │
+          │                  │                              │                  │
+          │                  │                              │                  │
+          │                  │                              │                  │
+          │                  │                              │                  │
+          │                  │                              │                  │
+          └──────────────────┘                              └──────────────────┘
+          ┌orders───▼────────┐                              ┌products─▼────────┐
+          │🗝 id INT          │▲                            ▲│🗝 id INT          │
+          │🔗  user_id INT?   ││                            ││  name VARCHAR(255│
+          │  status VARCHAR(5││                            ││🔗  category_id INT│
+          │  total DECIMAL?  ││                            ││  price DECIMAL?  │
+          │                  ││                            ││                  │
+          │                  ││                            ││                  │
+          │                  │└───┐                    ┌───┘│                  │
+          │                  │    │                    │    │                  │
+          └──────────────────┘    │                    │    └──────────────────┘
+                                  │┌order_items───────┐│
+                                  ││🗝 id INT          ││
+                                  ││🔗  order_id INT?  ││
+                                   │🔗  product_id INT?││
+                                   │  quantity INT?   │
+                                   │                  │
+                                   │                  │
+                                   │                  │
+                                   │                  │
+                                   └──────────────────┘

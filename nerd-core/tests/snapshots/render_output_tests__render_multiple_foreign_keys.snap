@@ -1,0 +1,24 @@
+---
+source: tests/render_output_tests.rs
+expression: output
+---
+                                        ┌categories────────┐
+                                       ▲│🗝 id INT          │
+                                       ││  name VARCHAR(100│
+                                       ││                  │
+                                       ││                  │
+                                       ││                  │
+                                       ││                  │
+                              ┌────────┘│                  │
+                              │         │                  │
+                              │         └──────────────────┘
+          ┌products──────────┐│                             ┌order_items───────┐
+          │🗝 id INT          │◄──────────────┐              │🗝 id INT          │
+          │  name VARCHAR(255││              └──────────────│🔗  product_id INT?│
+          │🔗  category_id INT││                             │  quantity INT?   │
+          │                  │                              │                  │
+          │                  │                              │                  │
+          │                  │                              │                  │
+          │                  │                              │                  │
+          │                  │                              │                  │
+          └──────────────────┘                              └──────────────────┘

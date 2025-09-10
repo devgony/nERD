@@ -1,0 +1,11 @@
+---
+source: tests/render_output_tests.rs
+expression: output
+---
+     ┌users─────────────┐          ┌posts─────────────┐
+     │🗝 id INT          │◄────┐    │🗝 id INT          │
+     │  name VARCHAR(100│     └────│🔗  user_id INT?   │
+     │                  │          │  title VARCHAR(25│
+     │                  │          │                  │
+     │                  │          │                  │
+     └──────────────────┘          └──────────────────┘

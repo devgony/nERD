@@ -1,6 +1,6 @@
-use crate::models::{Schema, Column, Entity, Position, Dimensions};
-use crate::parser::SqlParser;
 use crate::layout::LayoutEngine;
+use crate::models::{Column, Dimensions, Entity, Position, Schema};
+use crate::parser::SqlParser;
 use crate::sync::SchemaSync;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -29,7 +29,7 @@ pub struct App {
     pub layout_engine: LayoutEngine,
     pub entity_creator_buffer: String,
     pub schema_sync: SchemaSync,
-    pub last_generated_sql: String,
+    pub last_generated_sql: String, // TODO: what for?
 }
 
 impl App {
@@ -75,7 +75,8 @@ CREATE TABLE order_items (
     price DECIMAL(10,2) NOT NULL,
     FOREIGN KEY (order_id) REFERENCES orders(id),
     FOREIGN KEY (product_id) REFERENCES products(id)
-);"#.to_string();
+);"#
+        .to_string();
 
         let mut app = Self {
             schema: Schema::new(),
@@ -122,7 +123,9 @@ CREATE TABLE order_items (
             KeyCode::Char('v') => self.validate_schema(),
             KeyCode::Tab => self.cycle_selected_entity(),
             KeyCode::BackTab => self.cycle_selected_entity_reverse(),
-            KeyCode::Delete | KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            KeyCode::Delete | KeyCode::Char('d')
+                if key.modifiers.contains(KeyModifiers::CONTROL) =>
+            {
                 self.delete_selected_entity();
             }
             KeyCode::Up => self.move_selected_entity(0, -10),
@@ -149,14 +152,17 @@ CREATE TABLE order_items (
             KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.sync_sql_changes();
             }
-            
+
             // VIM normal mode commands
             KeyCode::Char('i') => {
                 self.vim_mode = VimMode::Insert;
             }
             KeyCode::Char('a') => {
                 self.vim_mode = VimMode::Insert;
-                self.cursor_position = self.cursor_position.saturating_add(1).min(self.sql_content.len());
+                self.cursor_position = self
+                    .cursor_position
+                    .saturating_add(1)
+                    .min(self.sql_content.len());
             }
             KeyCode::Char('A') => {
                 self.vim_mode = VimMode::Insert;
@@ -176,13 +182,16 @@ CREATE TABLE order_items (
                 self.vim_mode = VimMode::Insert;
                 self.insert_new_line_before();
             }
-            
+
             // Movement commands
             KeyCode::Char('h') | KeyCode::Left => {
                 self.cursor_position = self.cursor_position.saturating_sub(1);
             }
             KeyCode::Char('l') | KeyCode::Right => {
-                self.cursor_position = self.cursor_position.saturating_add(1).min(self.sql_content.len());
+                self.cursor_position = self
+                    .cursor_position
+                    .saturating_add(1)
+                    .min(self.sql_content.len());
             }
             KeyCode::Char('j') | KeyCode::Down => {
                 self.move_cursor_down();
@@ -202,7 +211,7 @@ CREATE TABLE order_items (
             KeyCode::Char('$') => {
                 self.move_to_end_of_line();
             }
-            
+
             // Delete commands
             KeyCode::Char('x') => {
                 self.delete_char_at_cursor();
@@ -212,10 +221,10 @@ CREATE TABLE order_items (
             }
             KeyCode::Char('d') => {
                 // Simple implementation: dd deletes current line
-                // In a full vim implementation, this would handle more complex delete operations
+                // TODO: In a full vim implementation, this would handle more complex delete operations
                 self.delete_current_line();
             }
-            
+
             _ => {}
         }
     }
@@ -243,7 +252,10 @@ CREATE TABLE order_items (
                 self.cursor_position = self.cursor_position.saturating_sub(1);
             }
             KeyCode::Right => {
-                self.cursor_position = self.cursor_position.saturating_add(1).min(self.sql_content.len());
+                self.cursor_position = self
+                    .cursor_position
+                    .saturating_add(1)
+                    .min(self.sql_content.len());
             }
             KeyCode::Up => {
                 self.move_cursor_up();
@@ -312,7 +324,11 @@ CREATE TABLE order_items (
             None => Some(entities.last().unwrap().clone()),
             Some(current) => {
                 if let Some(pos) = entities.iter().position(|e| e == current) {
-                    let prev_pos = if pos == 0 { entities.len() - 1 } else { pos - 1 };
+                    let prev_pos = if pos == 0 {
+                        entities.len() - 1
+                    } else {
+                        pos - 1
+                    };
                     Some(entities[prev_pos].clone())
                 } else {
                     Some(entities.last().unwrap().clone())
@@ -333,9 +349,9 @@ CREATE TABLE order_items (
     fn delete_selected_entity(&mut self) {
         if let Some(entity_name) = &self.selected_entity.clone() {
             self.schema.entities.remove(entity_name);
-            self.schema.relationships.retain(|r| {
-                r.from_table != *entity_name && r.to_table != *entity_name
-            });
+            self.schema
+                .relationships
+                .retain(|r| r.from_table != *entity_name && r.to_table != *entity_name);
             self.selected_entity = None;
         }
     }
@@ -360,7 +376,10 @@ CREATE TABLE order_items (
     }
 
     fn sync_sql_changes(&mut self) {
-        if let Ok(has_changes) = self.schema_sync.merge_sql_changes(&mut self.schema, &self.sql_content) {
+        if let Ok(has_changes) = self
+            .schema_sync
+            .merge_sql_changes(&mut self.schema, &self.sql_content)
+        {
             if has_changes {
                 self.layout_engine.layout_entities(&mut self.schema);
             }
@@ -379,7 +398,7 @@ CREATE TABLE order_items (
 
     fn validate_schema(&mut self) {
         let _errors = self.schema_sync.validate_schema(&self.schema);
-        // For now, just refresh layout - in a full implementation we'd show validation errors
+        // TODO: For now, just refresh layout - in a full implementation we'd show validation errors
         self.refresh_layout();
     }
 
@@ -390,25 +409,27 @@ CREATE TABLE order_items (
     fn create_entity_from_buffer(&mut self) {
         if !self.entity_creator_buffer.trim().is_empty() {
             let entity_name = self.entity_creator_buffer.trim().to_string();
+            // TODO: should be able to create column from entity creator
             let new_entity = Entity {
                 name: entity_name.clone(),
-                columns: vec![
-                    Column {
-                        name: "id".to_string(),
-                        data_type: "INT".to_string(),
-                        nullable: false,
-                        is_primary_key: true,
-                        is_foreign_key: false,
-                        references: None,
-                    }
-                ],
+                columns: vec![Column {
+                    name: "id".to_string(),
+                    data_type: "INT".to_string(),
+                    nullable: false,
+                    is_primary_key: true,
+                    is_foreign_key: false,
+                    references: None,
+                }],
                 position: Position {
                     x: 400.0 + (self.schema.entities.len() as f64 * 50.0),
                     y: 300.0 + (self.schema.entities.len() as f64 * 30.0),
                 },
-                dimensions: Dimensions { width: 20, height: 8 },
+                dimensions: Dimensions {
+                    width: 20,
+                    height: 8,
+                },
             };
-            
+
             self.schema.entities.insert(entity_name.clone(), new_entity);
             self.selected_entity = Some(entity_name);
         }
@@ -454,7 +475,7 @@ CREATE TABLE order_items (
     fn move_cursor_down(&mut self) {
         let lines: Vec<&str> = self.sql_content.split('\n').collect();
         let (current_line, col_in_line) = self.get_line_and_column();
-        
+
         if current_line < lines.len() - 1 {
             let next_line_len = lines[current_line + 1].len();
             let new_col = col_in_line.min(next_line_len);
@@ -479,17 +500,17 @@ CREATE TABLE order_items (
     fn move_word_forward(&mut self) {
         let chars: Vec<char> = self.sql_content.chars().collect();
         let mut pos = self.cursor_position;
-        
+
         // Skip current word
         while pos < chars.len() && chars[pos].is_alphanumeric() {
             pos += 1;
         }
-        
+
         // Skip whitespace
         while pos < chars.len() && chars[pos].is_whitespace() {
             pos += 1;
         }
-        
+
         self.cursor_position = pos.min(self.sql_content.len());
     }
 
@@ -497,20 +518,20 @@ CREATE TABLE order_items (
         if self.cursor_position == 0 {
             return;
         }
-        
+
         let chars: Vec<char> = self.sql_content.chars().collect();
         let mut pos = self.cursor_position.saturating_sub(1);
-        
+
         // Skip whitespace
         while pos > 0 && chars[pos].is_whitespace() {
             pos = pos.saturating_sub(1);
         }
-        
+
         // Skip to beginning of word
         while pos > 0 && chars[pos.saturating_sub(1)].is_alphanumeric() {
             pos = pos.saturating_sub(1);
         }
-        
+
         self.cursor_position = pos;
     }
 
@@ -527,16 +548,21 @@ CREATE TABLE order_items (
 
     fn delete_current_line(&mut self) {
         let (current_line, _) = self.get_line_and_column();
-        let lines: Vec<String> = self.sql_content.split('\n').map(|s| s.to_string()).collect();
-        
+        let lines: Vec<String> = self
+            .sql_content
+            .split('\n')
+            .map(|s| s.to_string())
+            .collect();
+
         if current_line < lines.len() {
             let mut new_lines = lines;
             new_lines.remove(current_line);
             self.sql_content = new_lines.join("\n");
-            
+
             // Adjust cursor position
             if current_line > 0 && !new_lines.is_empty() {
-                self.cursor_position = self.get_position_from_line_col(current_line.saturating_sub(1), 0);
+                self.cursor_position =
+                    self.get_position_from_line_col(current_line.saturating_sub(1), 0);
             } else {
                 self.cursor_position = 0;
             }
@@ -547,12 +573,12 @@ CREATE TABLE order_items (
         let mut line = 0;
         let mut col = 0;
         let mut pos = 0;
-        
+
         for ch in self.sql_content.chars() {
             if pos >= self.cursor_position {
                 break;
             }
-            
+
             if ch == '\n' {
                 line += 1;
                 col = 0;
@@ -561,7 +587,7 @@ CREATE TABLE order_items (
             }
             pos += ch.len_utf8();
         }
-        
+
         (line, col)
     }
 
@@ -569,16 +595,16 @@ CREATE TABLE order_items (
         let mut line = 0;
         let mut col = 0;
         let mut pos = 0;
-        
+
         for ch in self.sql_content.chars() {
             if line == target_line && col == target_col {
                 return pos;
             }
-            
+
             if line > target_line {
                 return pos;
             }
-            
+
             if ch == '\n' {
                 line += 1;
                 col = 0;
@@ -587,7 +613,7 @@ CREATE TABLE order_items (
             }
             pos += ch.len_utf8();
         }
-        
+
         pos
     }
 }
@@ -608,18 +634,18 @@ mod tests {
         let mut app = App::new();
         app.sql_content = "Hello\nWorld".to_string();
         app.cursor_position = 0;
-        
+
         // Test basic movement
         let (line, col) = app.get_line_and_column();
         assert_eq!(line, 0);
         assert_eq!(col, 0);
-        
+
         // Move to position 3 (middle of "Hello")
         app.cursor_position = 3;
         let (line, col) = app.get_line_and_column();
         assert_eq!(line, 0);
         assert_eq!(col, 3);
-        
+
         // Move to second line
         app.cursor_position = 6; // After newline
         let (line, col) = app.get_line_and_column();
@@ -632,7 +658,7 @@ mod tests {
         let mut app = App::new();
         app.sql_content = "Hello".to_string();
         app.cursor_position = 2;
-        
+
         app.insert_char_at_cursor('X');
         assert_eq!(app.sql_content, "HeXllo");
         assert_eq!(app.cursor_position, 3); // Cursor moved after inserted char
@@ -643,9 +669,10 @@ mod tests {
         let mut app = App::new();
         app.sql_content = "Hello".to_string();
         app.cursor_position = 2;
-        
+
         app.delete_char_at_cursor();
         assert_eq!(app.sql_content, "Helo");
         assert_eq!(app.cursor_position, 2); // Cursor stays at same position
     }
 }
+

@@ -203,6 +203,8 @@ impl DiagramRenderer {
             // Connect from left edge at column height (outside the border)
             (from_area.x.saturating_sub(1), from_column_y)
         } else if to_center_y > from_center_y {
+            // TODO: Even if from_x == to_x, it should be connected between columns
+
             // Connect from bottom edge (outside the border)
             (from_center_x, from_area.y + from_area.height)
         } else {
@@ -256,6 +258,8 @@ impl DiagramRenderer {
         entity_areas: &[Rect],
         area: Rect,
     ) {
+        // TODO: No logic?
+
         // Draw a proper line between the two points, avoiding entity areas
         self.draw_line_between_points_avoiding_entities(f, from, to, entity_areas, area);
     }
@@ -639,6 +643,7 @@ impl DiagramRenderer {
             let mid1 = (from.0, route_y);
             let mid2 = (to.0, route_y);
 
+            // TODO: why should draw vertical first
             self.draw_vertical_line_avoiding_entities(f, from, mid1, entity_areas, area);
             self.draw_horizontal_line_avoiding_entities(f, mid1, mid2, entity_areas, area);
             self.draw_vertical_line_avoiding_entities(f, mid2, to, entity_areas, area);

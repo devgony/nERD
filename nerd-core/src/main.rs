@@ -1,7 +1,7 @@
 mod app;
+mod layout;
 mod models;
 mod parser;
-mod layout;
 mod render;
 mod sync;
 
@@ -10,12 +10,9 @@ use app::App;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use ratatui::{
-    backend::CrosstermBackend,
-    Terminal,
-};
+use ratatui::{Terminal, backend::CrosstermBackend};
 use std::io;
 
 fn main() -> Result<()> {
@@ -43,10 +40,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn run_app<B: ratatui::backend::Backend>(
-    terminal: &mut Terminal<B>,
-    app: &mut App,
-) -> Result<()> {
+fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()> {
     loop {
         terminal.draw(|f| ui(f, app))?;
 
@@ -69,24 +63,29 @@ fn ui(f: &mut ratatui::Frame, app: &App) {
         style::{Color, Style},
         widgets::{Block, Borders, Paragraph},
     };
-    use render::{DiagramRenderer, render_help_screen, render_sql_editor_with_vim, render_entity_creator};
+    use render::{
+        DiagramRenderer, render_entity_creator, render_help_screen, render_sql_editor_with_vim,
+    };
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(1)
-        .constraints([
-            Constraint::Min(1),
-            Constraint::Length(3),
-        ])
+        .constraints([Constraint::Min(1), Constraint::Length(3)])
         .split(f.area());
 
     match app.mode {
         app::AppMode::DiagramView => {
-            let renderer = DiagramRenderer::new(800, 600);
+            let renderer = DiagramRenderer::new(app.layout_engine.width, app.layout_engine.height);
             renderer.render(f, &app.schema, chunks[0], &app.selected_entity);
         }
         app::AppMode::SqlEditor => {
-            render_sql_editor_with_vim(f, &app.sql_content, app.vim_mode, app.cursor_position, chunks[0]);
+            render_sql_editor_with_vim(
+                f,
+                &app.sql_content,
+                app.vim_mode,
+                app.cursor_position,
+                chunks[0],
+            );
         }
         app::AppMode::EntityCreator => {
             render_entity_creator(f, &app.entity_creator_buffer, chunks[0]);
@@ -98,12 +97,10 @@ fn ui(f: &mut ratatui::Frame, app: &App) {
 
     let mode_text = match app.mode {
         app::AppMode::DiagramView => "Diagram",
-        app::AppMode::SqlEditor => {
-            match app.vim_mode {
-                app::VimMode::Normal => "SQL Editor (NORMAL)",
-                app::VimMode::Insert => "SQL Editor (INSERT)",
-            }
-        }, 
+        app::AppMode::SqlEditor => match app.vim_mode {
+            app::VimMode::Normal => "SQL Editor (NORMAL)",
+            app::VimMode::Insert => "SQL Editor (INSERT)",
+        },
         app::AppMode::Help => "Help",
         app::AppMode::EntityCreator => "New Entity",
     };
@@ -126,6 +123,6 @@ fn ui(f: &mut ratatui::Frame, app: &App) {
     let status_bar = Paragraph::new(status_message)
         .block(Block::default().borders(Borders::ALL))
         .style(Style::default().fg(Color::Yellow));
-    
+
     f.render_widget(status_bar, chunks[1]);
 }

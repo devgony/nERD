@@ -1,11 +1,11 @@
-use crate::models::{Entity, Position, Schema, Relationship};
+use crate::models::{Entity, Position, Relationship, Schema};
 use petgraph::{Graph, Undirected};
 use std::collections::HashMap;
 use std::f64::consts::PI;
 
 pub struct LayoutEngine {
-    width: f64,
-    height: f64,
+    pub width: f64,
+    pub height: f64,
 }
 
 impl LayoutEngine {
@@ -37,12 +37,12 @@ impl LayoutEngine {
     fn layout_force_directed(&self, schema: &mut Schema) {
         let mut graph = Graph::<String, (), Undirected>::new_undirected();
         let mut node_indices = HashMap::new();
-        
+
         for entity_name in schema.entities.keys() {
             let node_index = graph.add_node(entity_name.clone());
             node_indices.insert(entity_name.clone(), node_index);
         }
-        
+
         for relationship in &schema.relationships {
             if let (Some(&from_idx), Some(&to_idx)) = (
                 node_indices.get(&relationship.from_table),
@@ -51,15 +51,15 @@ impl LayoutEngine {
                 graph.add_edge(from_idx, to_idx, ());
             }
         }
-        
+
         let mut positions: HashMap<String, Position> = HashMap::new();
-        
+
         self.initialize_positions(&mut positions, &schema.entities);
-        
+
         for _ in 0..100 {
             self.apply_forces(&mut positions, &schema.entities, &schema.relationships);
         }
-        
+
         for (entity_name, position) in positions {
             if let Some(entity) = schema.entities.get_mut(&entity_name) {
                 entity.position = position;
@@ -67,7 +67,11 @@ impl LayoutEngine {
         }
     }
 
-    fn initialize_positions(&self, positions: &mut HashMap<String, Position>, entities: &HashMap<String, Entity>) {
+    fn initialize_positions(
+        &self,
+        positions: &mut HashMap<String, Position>,
+        entities: &HashMap<String, Entity>,
+    ) {
         let entity_count = entities.len() as f64;
         let radius = (self.width.min(self.height) / 4.0).min(200.0);
         let center_x = self.width / 2.0;
@@ -77,7 +81,7 @@ impl LayoutEngine {
             let angle = 2.0 * PI * i as f64 / entity_count;
             let x = center_x + radius * angle.cos();
             let y = center_y + radius * angle.sin();
-            
+
             positions.insert(entity_name.clone(), Position { x, y });
         }
     }
@@ -89,17 +93,17 @@ impl LayoutEngine {
         relationships: &[Relationship],
     ) {
         let mut forces: HashMap<String, (f64, f64)> = HashMap::new();
-        
+
         for entity_name in entities.keys() {
             forces.insert(entity_name.clone(), (0.0, 0.0));
         }
-        
+
         self.apply_repulsion_forces(positions, &mut forces);
-        
+
         self.apply_attraction_forces(positions, &mut forces, relationships);
-        
+
         self.apply_forces_to_positions(positions, &forces);
-        
+
         self.keep_within_bounds(positions);
     }
 
@@ -110,21 +114,21 @@ impl LayoutEngine {
     ) {
         // Increased repulsion strength for broader margins
         let repulsion_strength = 15000.0;
-        
+
         for (entity1, pos1) in positions {
             for (entity2, pos2) in positions {
                 if entity1 == entity2 {
                     continue;
                 }
-                
+
                 let dx = pos1.x - pos2.x;
                 let dy = pos1.y - pos2.y;
                 let distance = (dx * dx + dy * dy).sqrt().max(1.0);
-                
+
                 let force = repulsion_strength / (distance * distance);
                 let fx = (dx / distance) * force;
                 let fy = (dy / distance) * force;
-                
+
                 if let Some((curr_fx, curr_fy)) = forces.get_mut(entity1) {
                     *curr_fx += fx;
                     *curr_fy += fy;
@@ -142,7 +146,7 @@ impl LayoutEngine {
         let attraction_strength = 100.0;
         // Increased ideal distance for more spacing
         let ideal_distance = 250.0;
-        
+
         for relationship in relationships {
             if let (Some(pos1), Some(pos2)) = (
                 positions.get(&relationship.from_table),
@@ -151,16 +155,16 @@ impl LayoutEngine {
                 let dx = pos2.x - pos1.x;
                 let dy = pos2.y - pos1.y;
                 let distance = (dx * dx + dy * dy).sqrt().max(1.0);
-                
+
                 let force = attraction_strength * (distance - ideal_distance) / distance;
                 let fx = (dx / distance) * force;
                 let fy = (dy / distance) * force;
-                
+
                 if let Some((curr_fx, curr_fy)) = forces.get_mut(&relationship.from_table) {
                     *curr_fx += fx;
                     *curr_fy += fy;
                 }
-                
+
                 if let Some((curr_fx, curr_fy)) = forces.get_mut(&relationship.to_table) {
                     *curr_fx -= fx;
                     *curr_fy -= fy;
@@ -176,12 +180,12 @@ impl LayoutEngine {
     ) {
         let damping = 0.1;
         let max_velocity = 10.0;
-        
+
         for (entity_name, (fx, fy)) in forces {
             if let Some(position) = positions.get_mut(entity_name) {
                 let vx = fx * damping;
                 let vy = fy * damping;
-                
+
                 let velocity = (vx * vx + vy * vy).sqrt();
                 if velocity > max_velocity {
                     let scale = max_velocity / velocity;
@@ -197,7 +201,7 @@ impl LayoutEngine {
 
     fn keep_within_bounds(&self, positions: &mut HashMap<String, Position>) {
         let margin = 50.0;
-        
+
         for position in positions.values_mut() {
             position.x = position.x.clamp(margin, self.width - margin);
             position.y = position.y.clamp(margin, self.height - margin);
@@ -208,25 +212,26 @@ impl LayoutEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{Column, RelationshipType, Dimensions};
+    use crate::models::{Column, Dimensions, RelationshipType};
 
     #[test]
     fn test_single_entity_layout() {
         let mut schema = Schema::new();
         let entity = Entity {
             name: "users".to_string(),
-            columns: vec![
-                Column {
-                    name: "id".to_string(),
-                    data_type: "INT".to_string(),
-                    nullable: false,
-                    is_primary_key: true,
-                    is_foreign_key: false,
-                    references: None,
-                },
-            ],
+            columns: vec![Column {
+                name: "id".to_string(),
+                data_type: "INT".to_string(),
+                nullable: false,
+                is_primary_key: true,
+                is_foreign_key: false,
+                references: None,
+            }],
             position: Position::default(),
-            dimensions: Dimensions { width: 20, height: 5 },
+            dimensions: Dimensions {
+                width: 20,
+                height: 5,
+            },
         };
         schema.entities.insert("users".to_string(), entity);
 
@@ -241,24 +246,30 @@ mod tests {
     #[test]
     fn test_multiple_entities_layout() {
         let mut schema = Schema::new();
-        
+
         let users = Entity {
             name: "users".to_string(),
             columns: vec![],
             position: Position::default(),
-            dimensions: Dimensions { width: 20, height: 5 },
+            dimensions: Dimensions {
+                width: 20,
+                height: 5,
+            },
         };
-        
+
         let posts = Entity {
             name: "posts".to_string(),
             columns: vec![],
             position: Position::default(),
-            dimensions: Dimensions { width: 20, height: 5 },
+            dimensions: Dimensions {
+                width: 20,
+                height: 5,
+            },
         };
-        
+
         schema.entities.insert("users".to_string(), users);
         schema.entities.insert("posts".to_string(), posts);
-        
+
         schema.relationships.push(Relationship {
             from_table: "posts".to_string(),
             from_column: "user_id".to_string(),
@@ -272,7 +283,7 @@ mod tests {
 
         let users_pos = &schema.entities.get("users").unwrap().position;
         let posts_pos = &schema.entities.get("posts").unwrap().position;
-        
+
         assert!(users_pos.x != posts_pos.x || users_pos.y != posts_pos.y);
         assert!(users_pos.x >= 50.0 && users_pos.x <= 750.0);
         assert!(users_pos.y >= 50.0 && users_pos.y <= 550.0);
@@ -280,3 +291,4 @@ mod tests {
         assert!(posts_pos.y >= 50.0 && posts_pos.y <= 550.0);
     }
 }
+

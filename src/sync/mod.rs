@@ -1,7 +1,12 @@
-use crate::models::{Schema, Entity, Column, Relationship};
+use crate::models::{Column, Entity, Relationship, Schema};
 use anyhow::Result;
 
-pub struct SchemaSync {
+pub struct SchemaSync {}
+
+impl Default for SchemaSync {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SchemaSync {
@@ -14,7 +19,7 @@ impl SchemaSync {
         let mut sql_statements = Vec::new();
 
         // Generate CREATE TABLE statements
-        for (_table_name, entity) in &schema.entities {
+        for entity in schema.entities.values() {
             let table_sql = self.generate_create_table(entity);
             sql_statements.push(table_sql);
         }
@@ -32,21 +37,25 @@ impl SchemaSync {
         let mut lines = Vec::new();
         lines.push(format!("CREATE TABLE {} (", entity.name));
 
-        let column_definitions: Vec<String> = entity.columns.iter().map(|col| {
-            let mut parts = Vec::new();
-            parts.push(format!("    {}", col.name));
-            parts.push(col.data_type.clone());
-            
-            if !col.nullable {
-                parts.push("NOT NULL".to_string());
-            }
-            
-            if col.is_primary_key {
-                parts.push("PRIMARY KEY".to_string());
-            }
+        let column_definitions: Vec<String> = entity
+            .columns
+            .iter()
+            .map(|col| {
+                let mut parts = Vec::new();
+                parts.push(format!("    {}", col.name));
+                parts.push(col.data_type.clone());
 
-            parts.join(" ")
-        }).collect();
+                if !col.nullable {
+                    parts.push("NOT NULL".to_string());
+                }
+
+                if col.is_primary_key {
+                    parts.push("PRIMARY KEY".to_string());
+                }
+
+                parts.join(" ")
+            })
+            .collect();
 
         lines.push(column_definitions.join(",\n"));
         lines.push(");".to_string());
@@ -55,7 +64,10 @@ impl SchemaSync {
     }
 
     fn generate_foreign_key_constraint(&self, relationship: &Relationship) -> String {
-        let constraint_name = format!("fk_{}_{}", relationship.from_table, relationship.from_column);
+        let constraint_name = format!(
+            "fk_{}_{}",
+            relationship.from_table, relationship.from_column
+        );
         format!(
             "ALTER TABLE {} ADD CONSTRAINT {} FOREIGN KEY ({}) REFERENCES {} ({});",
             relationship.from_table,
@@ -67,7 +79,11 @@ impl SchemaSync {
     }
 
     /// Merge changes from SQL back into the schema
-    pub fn merge_sql_changes(&self, current_schema: &mut Schema, sql_content: &str) -> Result<bool> {
+    pub fn merge_sql_changes(
+        &self,
+        current_schema: &mut Schema,
+        sql_content: &str,
+    ) -> Result<bool> {
         let parser = crate::parser::SqlParser::new();
         match parser.parse_sql(sql_content) {
             Ok(new_schema) => {
@@ -106,9 +122,11 @@ impl SchemaSync {
         }
 
         for new_rel in &new.relationships {
-            if !current.relationships.iter().any(|current_rel| {
-                self.relationships_equal(current_rel, new_rel)
-            }) {
+            if !current
+                .relationships
+                .iter()
+                .any(|current_rel| self.relationships_equal(current_rel, new_rel))
+            {
                 return true;
             }
         }
@@ -135,35 +153,35 @@ impl SchemaSync {
     }
 
     fn column_changed(&self, current: &Column, new: &Column) -> bool {
-        current.name != new.name ||
-        current.data_type != new.data_type ||
-        current.nullable != new.nullable ||
-        current.is_primary_key != new.is_primary_key ||
-        current.is_foreign_key != new.is_foreign_key ||
-        current.references != new.references
+        current.name != new.name
+            || current.data_type != new.data_type
+            || current.nullable != new.nullable
+            || current.is_primary_key != new.is_primary_key
+            || current.is_foreign_key != new.is_foreign_key
+            || current.references != new.references
     }
 
     fn relationships_equal(&self, a: &Relationship, b: &Relationship) -> bool {
-        a.from_table == b.from_table &&
-        a.from_column == b.from_column &&
-        a.to_table == b.to_table &&
-        a.to_column == b.to_column &&
-        a.relationship_type == b.relationship_type
+        a.from_table == b.from_table
+            && a.from_column == b.from_column
+            && a.to_table == b.to_table
+            && a.to_column == b.to_column
+            && a.relationship_type == b.relationship_type
     }
 
     fn apply_changes(&self, current_schema: &mut Schema, new_schema: Schema) {
         // Preserve positions of existing entities
         let mut preserved_entities = std::collections::HashMap::new();
-        
+
         for (name, new_entity) in new_schema.entities {
             let mut updated_entity = new_entity;
-            
+
             // Preserve position and dimensions if entity existed before
             if let Some(current_entity) = current_schema.entities.get(&name) {
                 updated_entity.position = current_entity.position;
                 updated_entity.dimensions = current_entity.dimensions;
             }
-            
+
             preserved_entities.insert(name, updated_entity);
         }
 
@@ -183,7 +201,7 @@ impl SchemaSync {
                     relationship.from_table
                 ));
             }
-            
+
             if !schema.entities.contains_key(&relationship.to_table) {
                 errors.push(format!(
                     "Foreign key references non-existent table: {}",
@@ -192,24 +210,28 @@ impl SchemaSync {
             }
 
             // Check if referenced columns exist
-            if let Some(from_entity) = schema.entities.get(&relationship.from_table) {
-                if !from_entity.columns.iter().any(|col| col.name == relationship.from_column) {
-                    errors.push(format!(
-                        "Foreign key column '{}' not found in table '{}'",
-                        relationship.from_column,
-                        relationship.from_table
-                    ));
-                }
+            if let Some(from_entity) = schema.entities.get(&relationship.from_table)
+                && !from_entity
+                    .columns
+                    .iter()
+                    .any(|col| col.name == relationship.from_column)
+            {
+                errors.push(format!(
+                    "Foreign key column '{}' not found in table '{}'",
+                    relationship.from_column, relationship.from_table
+                ));
             }
 
-            if let Some(to_entity) = schema.entities.get(&relationship.to_table) {
-                if !to_entity.columns.iter().any(|col| col.name == relationship.to_column) {
-                    errors.push(format!(
-                        "Referenced column '{}' not found in table '{}'",
-                        relationship.to_column,
-                        relationship.to_table
-                    ));
-                }
+            if let Some(to_entity) = schema.entities.get(&relationship.to_table)
+                && !to_entity
+                    .columns
+                    .iter()
+                    .any(|col| col.name == relationship.to_column)
+            {
+                errors.push(format!(
+                    "Referenced column '{}' not found in table '{}'",
+                    relationship.to_column, relationship.to_table
+                ));
             }
         }
 
@@ -227,12 +249,12 @@ impl SchemaSync {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{Position, Dimensions};
+    use crate::models::{Dimensions, Position};
 
     #[test]
     fn test_generate_simple_table_sql() {
         let sync = SchemaSync::new();
-        
+
         let entity = Entity {
             name: "users".to_string(),
             columns: vec![
@@ -254,7 +276,10 @@ mod tests {
                 },
             ],
             position: Position::default(),
-            dimensions: Dimensions { width: 20, height: 5 },
+            dimensions: Dimensions {
+                width: 20,
+                height: 5,
+            },
         };
 
         let sql = sync.generate_create_table(&entity);
@@ -277,7 +302,10 @@ mod tests {
             name: "test".to_string(),
             columns: vec![],
             position: Position::default(),
-            dimensions: Dimensions { width: 20, height: 5 },
+            dimensions: Dimensions {
+                width: 20,
+                height: 5,
+            },
         };
         schema2.entities.insert("test".to_string(), entity);
 
@@ -292,18 +320,19 @@ mod tests {
         // Add entity without primary key
         let entity = Entity {
             name: "invalid".to_string(),
-            columns: vec![
-                Column {
-                    name: "name".to_string(),
-                    data_type: "VARCHAR(50)".to_string(),
-                    nullable: false,
-                    is_primary_key: false,
-                    is_foreign_key: false,
-                    references: None,
-                },
-            ],
+            columns: vec![Column {
+                name: "name".to_string(),
+                data_type: "VARCHAR(50)".to_string(),
+                nullable: false,
+                is_primary_key: false,
+                is_foreign_key: false,
+                references: None,
+            }],
             position: Position::default(),
-            dimensions: Dimensions { width: 20, height: 5 },
+            dimensions: Dimensions {
+                width: 20,
+                height: 5,
+            },
         };
         schema.entities.insert("invalid".to_string(), entity);
 

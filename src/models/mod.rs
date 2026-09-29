@@ -59,6 +59,12 @@ pub struct Schema {
     pub relationships: Vec<Relationship>,
 }
 
+impl Default for Schema {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Schema {
     pub fn new() -> Self {
         Self {

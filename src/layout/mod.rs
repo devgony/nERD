@@ -1,5 +1,4 @@
 use crate::models::{Entity, Position, Relationship, Schema};
-use petgraph::{Graph, Undirected};
 use std::collections::HashMap;
 use std::f64::consts::PI;
 
@@ -35,23 +34,6 @@ impl LayoutEngine {
     }
 
     fn layout_force_directed(&self, schema: &mut Schema) {
-        let mut graph = Graph::<String, (), Undirected>::new_undirected();
-        let mut node_indices = HashMap::new();
-
-        for entity_name in schema.entities.keys() {
-            let node_index = graph.add_node(entity_name.clone());
-            node_indices.insert(entity_name.clone(), node_index);
-        }
-
-        for relationship in &schema.relationships {
-            if let (Some(&from_idx), Some(&to_idx)) = (
-                node_indices.get(&relationship.from_table),
-                node_indices.get(&relationship.to_table),
-            ) {
-                graph.add_edge(from_idx, to_idx, ());
-            }
-        }
-
         let mut positions: HashMap<String, Position> = HashMap::new();
 
         self.initialize_positions(&mut positions, &schema.entities);
@@ -291,4 +273,3 @@ mod tests {
         assert!(posts_pos.y >= 50.0 && posts_pos.y <= 550.0);
     }
 }
-

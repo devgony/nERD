@@ -28,7 +28,10 @@ CREATE TABLE books (
     pages INT,
     author_id INT NOT NULL,
     publisher_id INT NOT NULL,
-    category_id INT NOT NULL
+    category_id INT NOT NULL,
+    FOREIGN KEY (author_id) REFERENCES authors(id),
+    FOREIGN KEY (publisher_id) REFERENCES publishers(id),
+    FOREIGN KEY (category_id) REFERENCES categories(id)
 );
 
 CREATE TABLE members (
@@ -47,13 +50,7 @@ CREATE TABLE loans (
     loan_date DATE DEFAULT CURRENT_DATE,
     due_date DATE NOT NULL,
     return_date DATE,
-    status VARCHAR(20) DEFAULT 'active'
+    status VARCHAR(20) DEFAULT 'active',
+    FOREIGN KEY (book_id) REFERENCES books(id),
+    FOREIGN KEY (member_id) REFERENCES members(id)
 );
-
--- Note: The current parser focuses on CREATE TABLE statements
--- In a full implementation, these foreign key relationships would be detected:
--- books.author_id -> authors.id
--- books.publisher_id -> publishers.id  
--- books.category_id -> categories.id
--- loans.book_id -> books.id
--- loans.member_id -> members.id

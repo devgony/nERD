@@ -14,7 +14,8 @@ CREATE TABLE posts (
     author_id INT NOT NULL,
     published_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (author_id) REFERENCES authors(id)
 );
 
 CREATE TABLE tags (
@@ -26,7 +27,9 @@ CREATE TABLE tags (
 CREATE TABLE post_tags (
     post_id INT NOT NULL,
     tag_id INT NOT NULL,
-    PRIMARY KEY (post_id, tag_id)
+    PRIMARY KEY (post_id, tag_id),
+    FOREIGN KEY (post_id) REFERENCES posts(id),
+    FOREIGN KEY (tag_id) REFERENCES tags(id)
 );
 
 CREATE TABLE comments (
@@ -35,5 +38,6 @@ CREATE TABLE comments (
     author_name VARCHAR(100) NOT NULL,
     author_email VARCHAR(255) NOT NULL,
     content TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (post_id) REFERENCES posts(id)
 );

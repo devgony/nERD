@@ -1,92 +1,106 @@
-mod app;
-mod builder;
-mod ui;
-
 use anyhow::Result;
-use app::AppState;
-use color_eyre::config::HookBuilder;
-use std::{
-    error::Error,
-    io::stdout,
+use crossterm::{
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event},
+    execute,
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
+use nerd_core::app::{self, App};
+use ratatui::{Terminal, backend::CrosstermBackend};
+use std::io;
 
-use ratatui::{
-    backend::{Backend, CrosstermBackend},
-    crossterm::{
-        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-        ExecutableCommand,
-    },
-    Terminal,
-};
+fn main() -> Result<()> {
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
 
-use crate::{app::App, ui::ui};
+    let mut app = App::new();
+    let res = run_app(&mut terminal, &mut app);
 
-fn main() -> Result<(), Box<dyn Error>> {
-    init_error_hooks()?;
-    let mut terminal = init_terminal()?;
+    disable_raw_mode()?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
+    terminal.show_cursor()?;
 
-    // should be enough complicated table exaples at least more than 6 columns
-    let sql_text =
-        "CREATE TABLE Employee (id int, name text, age int, salary int, address text, phone text);
-CREATE TABLE Department (id int, name text, location text);
-CREATE TABLE EmployeeDepartment (id int, employee_id int, department_id int);
-CREATE TABLE EmployeeManager (id int, employee_id int, manager_id int);
-CREATE TABLE Manager (id int, name text, age int, salary int, address text, phone text);
-CREATE TABLE EmployeeSalary (id int, employee_id int, salary int);
-CREATE TABLE EmployeeAddress (id int, employee_id int, address text);
-CREATE TABLE EmployeePhone (id int, employee_id int, phone text);
-CREATE TABLE DepartmentLocation (id int, department_id int, location text);
-CREATE TABLE DepartmentManager (id int, department_id int, manager_id int);
-CREATE TABLE ManagerSalary (id int, manager_id int, salary int);
-CREATE TABLE ManagerAddress (id int, manager_id int, address text);
-CREATE TABLE ManagerPhone (id int, manager_id int, phone text);
-CREATE TABLE SalaryAddress (id int, salary_id int, address_id int);
-CREATE TABLE SalaryPhone (id int, salary_id int, phone_id int);"
-            .to_string();
-
-    let mut app = App::new(sql_text);
-    run_app(&mut terminal, &mut app)?;
-
-    restore_terminal()?;
-
-    Ok(())
+    res
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()> {
-    while app.state != AppState::Quit {
+fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()> {
+    loop {
         terminal.draw(|f| ui(f, app))?;
 
-        app.handle_events()?;
+        if let Event::Key(key) = event::read()? {
+            app.handle_key(key);
+        }
+
+        if app.should_quit {
+            return Ok(());
+        }
+    }
+}
+
+fn ui(f: &mut ratatui::Frame, app: &App) {
+    use nerd_core::render::{
+        DiagramRenderer, render_entity_creator, render_help_screen, render_sql_editor_with_vim,
+    };
+    use ratatui::{
+        layout::{Constraint, Direction, Layout},
+        style::{Color, Style},
+        widgets::{Block, Borders, Paragraph},
+    };
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(1)
+        .constraints([Constraint::Min(1), Constraint::Length(3)])
+        .split(f.area());
+
+    match app.mode {
+        app::AppMode::DiagramView => {
+            let renderer = DiagramRenderer::new(app.layout_engine.width, app.layout_engine.height);
+            renderer.render(f, &app.schema, chunks[0], &app.selected_entity);
+        }
+        app::AppMode::SqlEditor => {
+            render_sql_editor_with_vim(
+                f,
+                &app.sql_content,
+                app.vim_mode,
+                app.cursor_position,
+                chunks[0],
+            );
+        }
+        app::AppMode::EntityCreator => {
+            render_entity_creator(f, &app.entity_creator_buffer, chunks[0]);
+        }
+        app::AppMode::Help => {
+            render_help_screen(f, chunks[0]);
+        }
     }
 
-    Ok(())
-}
+    let mode_text = match app.mode {
+        app::AppMode::DiagramView => "Diagram",
+        app::AppMode::SqlEditor => match app.vim_mode {
+            app::VimMode::Normal => "SQL Editor (NORMAL)",
+            app::VimMode::Insert => "SQL Editor (INSERT)",
+        },
+        app::AppMode::Help => "Help",
+        app::AppMode::EntityCreator => "New Entity",
+    };
 
-fn init_error_hooks() -> Result<()> {
-    let (panic, error) = HookBuilder::default().into_hooks();
-    let panic = panic.into_panic_hook();
-    let error = error.into_eyre_hook();
-    color_eyre::eyre::set_hook(Box::new(move |e| {
-        let _ = restore_terminal();
-        error(e)
-    }))?;
-    std::panic::set_hook(Box::new(move |info| {
-        let _ = restore_terminal();
-        panic(info)
-    }));
-    Ok(())
-}
+    let status_message = format!(
+        "Mode: {} | Entities: {} | Relationships: {}",
+        mode_text,
+        app.schema.entities.len(),
+        app.schema.relationships.len()
+    );
 
-fn init_terminal() -> Result<Terminal<impl Backend>> {
-    enable_raw_mode()?;
-    stdout().execute(EnterAlternateScreen)?;
-    let backend = CrosstermBackend::new(stdout());
-    let terminal = Terminal::new(backend)?;
-    Ok(terminal)
-}
+    let status_bar = Paragraph::new(status_message)
+        .block(Block::default().borders(Borders::ALL))
+        .style(Style::default().fg(Color::Yellow));
 
-fn restore_terminal() -> Result<()> {
-    disable_raw_mode()?;
-    stdout().execute(LeaveAlternateScreen)?;
-    Ok(())
+    f.render_widget(status_bar, chunks[1]);
 }

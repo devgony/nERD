@@ -80,7 +80,7 @@ impl DiagramRenderer {
         };
 
         let block = Block::default()
-            .title(entity.name.clone())
+            .title(entity.name.as_str())
             .title_style(title_style)
             .borders(Borders::ALL)
             .border_style(border_style);
@@ -173,7 +173,13 @@ impl DiagramRenderer {
             .map(|entity| self.calculate_entity_area(entity, area))
             .collect();
 
-        self.draw_connection_line_avoiding_entities(f, from_point, to_point, &entity_areas, area);
+        self.draw_line_between_points_avoiding_entities(
+            f,
+            from_point,
+            to_point,
+            &entity_areas,
+            area,
+        );
     }
 
     fn calculate_column_connection_points(
@@ -203,8 +209,6 @@ impl DiagramRenderer {
             // Connect from left edge at column height (outside the border)
             (from_area.x.saturating_sub(1), from_column_y)
         } else if to_center_y > from_center_y {
-            // TODO: Even if from_x == to_x, it should be connected between columns
-
             // Connect from bottom edge (outside the border)
             (from_center_x, from_area.y + from_area.height)
         } else {
@@ -250,20 +254,6 @@ impl DiagramRenderer {
         inner_y + column_index as u16
     }
 
-    fn draw_connection_line_avoiding_entities(
-        &self,
-        f: &mut Frame,
-        from: (u16, u16),
-        to: (u16, u16),
-        entity_areas: &[Rect],
-        area: Rect,
-    ) {
-        // TODO: No logic?
-
-        // Draw a proper line between the two points, avoiding entity areas
-        self.draw_line_between_points_avoiding_entities(f, from, to, entity_areas, area);
-    }
-
     fn draw_line_between_points_avoiding_entities(
         &self,
         f: &mut Frame,
@@ -272,13 +262,8 @@ impl DiagramRenderer {
         entity_areas: &[Rect],
         area: Rect,
     ) {
-        // For smoother lines, use a 3-segment approach:
-        // 1. Horizontal/vertical segment from start
-        // 2. Diagonal segment (if needed)
-        // 3. Horizontal/vertical segment to end
         self.draw_smooth_line_avoiding_entities(f, from, to, entity_areas, area);
 
-        // Draw arrow heads to show direction (from FK to PK)
         self.draw_arrow_head(f, to, from, area);
     }
 
@@ -550,9 +535,9 @@ impl DiagramRenderer {
 
     fn point_is_inside_entity(&self, x: u16, y: u16, entity_area: &Rect) -> bool {
         x >= entity_area.x
-            && x <= entity_area.x + entity_area.width - 1
+            && x < entity_area.x + entity_area.width
             && y >= entity_area.y
-            && y <= entity_area.y + entity_area.height - 1
+            && y < entity_area.y + entity_area.height
     }
 
     fn line_intersects_entities(
@@ -643,7 +628,6 @@ impl DiagramRenderer {
             let mid1 = (from.0, route_y);
             let mid2 = (to.0, route_y);
 
-            // TODO: why should draw vertical first
             self.draw_vertical_line_avoiding_entities(f, from, mid1, entity_areas, area);
             self.draw_horizontal_line_avoiding_entities(f, mid1, mid2, entity_areas, area);
             self.draw_vertical_line_avoiding_entities(f, mid2, to, entity_areas, area);
@@ -721,8 +705,10 @@ impl DiagramRenderer {
         // Determine arrow character based on direction
         let arrow_char = if dx.abs() > dy.abs() {
             if dx > 0 { "◄" } else { "►" }
+        } else if dy > 0 {
+            "▲"
         } else {
-            if dy > 0 { "▲" } else { "▼" }
+            "▼"
         };
 
         let arrow_area = Rect {
@@ -741,8 +727,8 @@ impl DiagramRenderer {
     }
 
     fn calculate_entity_area(&self, entity: &Entity, canvas_area: Rect) -> Rect {
-        let x_ratio = entity.position.x / (self.canvas_width as f64);
-        let y_ratio = entity.position.y / (self.canvas_height as f64);
+        let x_ratio = entity.position.x / self.canvas_width;
+        let y_ratio = entity.position.y / self.canvas_height;
 
         let x = (x_ratio * canvas_area.width as f64) as u16 + canvas_area.x;
         let y = (y_ratio * canvas_area.height as f64) as u16 + canvas_area.y;
@@ -770,7 +756,6 @@ pub fn render_help_screen(f: &mut Frame, area: Rect) {
         Line::from("  i          - Import SQL (or switch to editor)"),
         Line::from("  g          - Generate SQL from diagram"),
         Line::from("  r          - Refresh/re-layout diagram"),
-        Line::from("  v          - Validate schema"),
         Line::from("  ?          - Show this help screen"),
         Line::from("  Esc        - Return to diagram view"),
         Line::from(""),
@@ -778,11 +763,10 @@ pub fn render_help_screen(f: &mut Frame, area: Rect) {
         Line::from("  Tab        - Select next entity"),
         Line::from("  Shift+Tab  - Select previous entity"),
         Line::from("  ↑↓←→       - Move selected entity"),
-        Line::from("  Ctrl+D/Del - Delete selected entity"),
+        Line::from("  Ctrl+D     - Delete selected entity"),
         Line::from(""),
         Line::from("SQL Editor (VIM Mode):"),
         Line::from("  Ctrl+S     - Sync SQL changes to diagram"),
-        Line::from("  g          - Generate SQL from current diagram"),
         Line::from(""),
         Line::from("VIM Normal Mode:"),
         Line::from("  i          - Enter INSERT mode"),
@@ -810,7 +794,7 @@ pub fn render_help_screen(f: &mut Frame, area: Rect) {
         Line::from(""),
         Line::from("Selected entities are highlighted in yellow."),
         Line::from("Smooth red relationship lines connect exact columns (FK → PK)."),
-        Line::from("Press any key to return."),
+        Line::from("Press Esc or q to return."),
     ];
 
     let help = Paragraph::new(help_text)
@@ -840,7 +824,6 @@ pub fn render_sql_editor_with_vim(
     area: Rect,
 ) {
     use crate::app::VimMode;
-    use ratatui::layout::Constraint;
 
     let vim_mode_text = match vim_mode {
         VimMode::Normal => "-- NORMAL --",
@@ -860,9 +843,7 @@ pub fn render_sql_editor_with_vim(
 
     // Create content with visible cursor
     let content_with_cursor = if content.is_empty() {
-        format!(
-            "Enter SQL CREATE TABLE statements here.\nPress 'i' to enter INSERT mode, ESC for NORMAL mode.\nPress Ctrl+S to parse and apply.\nPress Esc in NORMAL mode to return to diagram view.\n\n█"
-        ) // Block cursor for empty
+        "Enter SQL CREATE TABLE statements here.\nPress 'i' to enter INSERT mode, ESC for NORMAL mode.\nPress Ctrl+S to parse and apply.\nPress Esc in NORMAL mode to return to diagram view.\n\n█".to_string() // Block cursor for empty
     } else {
         insert_cursor_in_content(content, cursor_position, vim_mode)
     };
@@ -1165,60 +1146,8 @@ mod tests {
     }
 
     #[test]
-    fn test_direct_line_edge_cases() {
-        let _renderer = DiagramRenderer::new(800.0, 600.0);
-
-        // Test that pure horizontal lines don't create corner artifacts
-        // This would previously create unwanted ┼ characters
-
-        // Pure horizontal case (dy = 0)
-        let from_horizontal = (10, 20);
-        let to_horizontal = (50, 20); // Same Y coordinate
-
-        // Pure vertical case (dx = 0)
-        let from_vertical = (30, 10);
-        let to_vertical = (30, 40); // Same X coordinate
-
-        // These should not panic and should use direct line drawing
-        // The test passes if the methods execute without errors
-        assert_ne!(from_horizontal, to_horizontal); // Ensure we have a line to draw
-        assert_ne!(from_vertical, to_vertical); // Ensure we have a line to draw
-
-        // The key test: coordinates with zero dx or dy should be handled as direct lines
-        let dx = to_horizontal.0 as i32 - from_horizontal.0 as i32;
-        let dy = to_horizontal.1 as i32 - from_horizontal.1 as i32;
-        assert_eq!(dy, 0); // Horizontal line
-        assert_ne!(dx, 0); // But has horizontal distance
-
-        let dx_vert = to_vertical.0 as i32 - from_vertical.0 as i32;
-        let dy_vert = to_vertical.1 as i32 - from_vertical.1 as i32;
-        assert_eq!(dx_vert, 0); // Vertical line  
-        assert_ne!(dy_vert, 0); // But has vertical distance
-    }
-
-    #[test]
     fn test_entity_penetration_avoidance() {
-        use crate::models::Column;
-
         let renderer = DiagramRenderer::new(800.0, 600.0);
-
-        // Create a test entity that would block line segments
-        let _blocking_entity = Entity {
-            name: "blocker".to_string(),
-            columns: vec![Column {
-                name: "id".to_string(),
-                data_type: "INT".to_string(),
-                nullable: false,
-                is_primary_key: true,
-                is_foreign_key: false,
-                references: None,
-            }],
-            position: Position { x: 50.0, y: 50.0 },
-            dimensions: Dimensions {
-                width: 20,
-                height: 5,
-            },
-        };
 
         // Create entity area that would be in the path of a line
         let entity_area = Rect {
@@ -1249,4 +1178,3 @@ mod tests {
         assert!(!renderer.point_is_inside_entity(15, 15, &entity_area)); // Just below entity
     }
 }
-

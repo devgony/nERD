@@ -1,38 +1,18 @@
 [package]
-name = "nERD"
+name = "nerd-core"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+rust-version = "1.88"
 authors = ["henry <devgony@gmail.com>"]
-license = "Apache-2.0"
-license-file = "LICENSE"
 description = "The nerdy Entity Relationship Diagram"
-documentation = "https://docs.rs/nERD"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "Apache-2.0"
 
 [dependencies]
-anyhow = "1.0.89"
-color-eyre = "0.6.3"
-gluesql-core = { git = "https://github.com/gluesql/gluesql", rev = "25309dd15a50ee061e714576079b2cd8c1fcca9c" }
-sqlparser = "0.45.0"
-# ratatui = { version = "0.28.1", features = ["all-widgets"] }
-ratatui = "0.29.0"
-tui-scrollview = "0.5.0"
-tui-textarea = "0.7.0"
-thiserror = "1.0"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-insta = "1.41"
+ratatui = "0.28"
+crossterm = "0.28"
+sqlparser = "0.52"
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 
-[dependencies.cursive]
-version = "0.20"
-# default-features = false
-# features = ["crossterm-backend"]
-
-# [dependencies.crossterm]
-# version = "0.23"
-# features = ["event-stream"]
-
-# [[bin]]
-# name = "graph"
-# path = "src/graph.rs"
+[dev-dependencies]
+insta = { version = "1.40", features = ["yaml"] }

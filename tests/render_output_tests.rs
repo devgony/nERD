@@ -1,10 +1,25 @@
-use nerd_core::{parser::SqlParser, render::DiagramRenderer};
-use ratatui::{
-    backend::TestBackend,
-    Terminal,
-    layout::Rect,
-};
 use insta::assert_snapshot;
+use nerd_core::{parser::SqlParser, render::DiagramRenderer};
+use ratatui::{Terminal, backend::TestBackend, buffer::Buffer, layout::Rect};
+
+fn buffer_contents(buffer: &Buffer) -> String {
+    let mut output = String::new();
+
+    for y in buffer.area.y..buffer.area.y + buffer.area.height {
+        let mut line = String::new();
+        for x in buffer.area.x..buffer.area.x + buffer.area.width {
+            line.push_str(buffer[(x, y)].symbol());
+        }
+
+        let line = line.trim_end();
+        if !line.is_empty() {
+            output.push_str(line);
+            output.push('\n');
+        }
+    }
+
+    output
+}
 
 #[test]
 fn test_render_simple_foreign_key_relationship() {
@@ -24,9 +39,9 @@ fn test_render_simple_foreign_key_relationship() {
 
     let parser = SqlParser::new();
     let mut schema = parser.parse_sql(sql).expect("Failed to parse SQL");
-    
+
     // Layout entities (skip automatic layout, we'll position manually)
-    
+
     // Manually position entities for consistent output
     if let Some(users) = schema.entities.get_mut("users") {
         users.position.x = 5.0;
@@ -36,35 +51,21 @@ fn test_render_simple_foreign_key_relationship() {
         posts.position.x = 35.0;
         posts.position.y = 5.0;
     }
-    
+
     // Create a test terminal
     let backend = TestBackend::new(80, 30);
     let mut terminal = Terminal::new(backend).unwrap();
-    
-    terminal.draw(|f| {
-        let area = Rect::new(0, 0, 80, 30);
-        let renderer = DiagramRenderer::new(80, 30);
-        renderer.render(f, &schema, area, &None);
-    }).unwrap();
-    
-    // Get the buffer content as string
-    let buffer = terminal.backend().buffer();
-    let mut output = String::new();
-    
-    for y in 0..30 {
-        let mut line = String::new();
-        for x in 0..80 {
-            let cell = &buffer[(x, y)];
-            line.push_str(cell.symbol());
-        }
-        // Trim trailing whitespace from each line
-        let trimmed = line.trim_end();
-        if !trimmed.is_empty() || y == 0 {  // Keep first line even if empty
-            output.push_str(trimmed);
-            output.push('\n');
-        }
-    }
-    
+
+    terminal
+        .draw(|f| {
+            let area = Rect::new(0, 0, 80, 30);
+            let renderer = DiagramRenderer::new(80.0, 30.0);
+            renderer.render(f, &schema, area, &None);
+        })
+        .unwrap();
+
+    let output = buffer_contents(terminal.backend().buffer());
+
     assert_snapshot!(output);
 }
 
@@ -93,9 +94,9 @@ fn test_render_multiple_foreign_keys() {
 
     let parser = SqlParser::new();
     let mut schema = parser.parse_sql(sql).expect("Failed to parse SQL");
-    
+
     // Layout entities (skip automatic layout, we'll position manually)
-    
+
     // Position entities in a triangle formation
     if let Some(categories) = schema.entities.get_mut("categories") {
         categories.position.x = 40.0;
@@ -109,35 +110,21 @@ fn test_render_multiple_foreign_keys() {
         order_items.position.x = 60.0;
         order_items.position.y = 15.0;
     }
-    
+
     // Create a test terminal
     let backend = TestBackend::new(100, 40);
     let mut terminal = Terminal::new(backend).unwrap();
-    
-    terminal.draw(|f| {
-        let area = Rect::new(0, 0, 100, 40);
-        let renderer = DiagramRenderer::new(100, 40);
-        renderer.render(f, &schema, area, &None);
-    }).unwrap();
-    
-    // Get the buffer content as string
-    let buffer = terminal.backend().buffer();
-    let mut output = String::new();
-    
-    for y in 0..40 {
-        let mut line = String::new();
-        for x in 0..100 {
-            let cell = &buffer[(x, y)];
-            line.push_str(cell.symbol());
-        }
-        // Trim trailing whitespace from each line
-        let trimmed = line.trim_end();
-        if !trimmed.is_empty() {
-            output.push_str(trimmed);
-            output.push('\n');
-        }
-    }
-    
+
+    terminal
+        .draw(|f| {
+            let area = Rect::new(0, 0, 100, 40);
+            let renderer = DiagramRenderer::new(100.0, 40.0);
+            renderer.render(f, &schema, area, &None);
+        })
+        .unwrap();
+
+    let output = buffer_contents(terminal.backend().buffer());
+
     assert_snapshot!(output);
 }
 
@@ -183,7 +170,7 @@ fn test_render_complex_schema_with_relationships() {
 
     let parser = SqlParser::new();
     let mut schema = parser.parse_sql(sql).expect("Failed to parse SQL");
-    
+
     // Position entities with better spacing to test line routing
     if let Some(users) = schema.entities.get_mut("users") {
         users.position.x = 5.0;
@@ -205,34 +192,20 @@ fn test_render_complex_schema_with_relationships() {
         order_items.position.x = 35.0;
         order_items.position.y = 30.0;
     }
-    
+
     // Create a test terminal
     let backend = TestBackend::new(100, 40);
     let mut terminal = Terminal::new(backend).unwrap();
-    
-    terminal.draw(|f| {
-        let area = Rect::new(0, 0, 100, 40);
-        let renderer = DiagramRenderer::new(100, 40);
-        renderer.render(f, &schema, area, &None);
-    }).unwrap();
-    
-    // Get the buffer content as string
-    let buffer = terminal.backend().buffer();
-    let mut output = String::new();
-    
-    for y in 0..40 {
-        let mut line = String::new();
-        for x in 0..100 {
-            let cell = &buffer[(x, y)];
-            line.push_str(cell.symbol());
-        }
-        // Trim trailing whitespace
-        let trimmed = line.trim_end();
-        if !trimmed.is_empty() {
-            output.push_str(trimmed);
-            output.push('\n');
-        }
-    }
-    
+
+    terminal
+        .draw(|f| {
+            let area = Rect::new(0, 0, 100, 40);
+            let renderer = DiagramRenderer::new(100.0, 40.0);
+            renderer.render(f, &schema, area, &None);
+        })
+        .unwrap();
+
+    let output = buffer_contents(terminal.backend().buffer());
+
     assert_snapshot!(output);
 }
